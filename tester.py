@@ -7,8 +7,11 @@ import ctypes
 
 # Setup for C function
 lib = ctypes.CDLL('./libprimes.so') 
+cudalib = ctypes.CDLL('./cudaprimes.so')
 lib.compute_primes.argtypes = [ctypes.c_longlong, ctypes.POINTER(ctypes.c_longlong), ctypes.POINTER(ctypes.c_longlong)]
 lib.compute_primes.restype = None
+cudalib.compute_primes.argtypes = [ctypes.c_longlong, ctypes.POINTER(ctypes.c_longlong), ctypes.POINTER(ctypes.c_longlong)]
+cudalib.compute_primes.restype = None
 result = ctypes.c_longlong()
 factor = ctypes.c_longlong()
 
@@ -26,9 +29,14 @@ def test_it():
     brute_force = 0
     intelligent =  0
     c_intelligent = 0
+    cuda = 0
     for k in range(TEST_NUMBERS):
         b = get_prime()
         c = get_prime()
+        start_time= time.time()
+        cudalib.compute_primes(b*c, ctypes.byref(result), ctypes.byref(factor))
+        end_time =time.time()
+        cuda += end_time - start_time
         start_time= time.time()
         lib.compute_primes(b*c, ctypes.byref(result), ctypes.byref(factor))
         end_time =time.time()
@@ -41,9 +49,11 @@ def test_it():
         I.compute_primes(b*c)
         end_time =time.time()
         intelligent += end_time - start_time
-    print("Intelligent took on average: "+ str(intelligent/TEST_NUMBERS)+" seconds to compute "+ str(MAX_RANGE)+" amount.\n")
-    print("Brute Force took on average: "+ str(brute_force/TEST_NUMBERS)+" seconds to compute "+str(MAX_RANGE)+" amount.\n")
-    print("C Intelligent took on average: "+ str(c_intelligent/TEST_NUMBERS)+" seconds to compute "+str(MAX_RANGE)+" amount.\n")
+    print("Intelligent took on average: "+ str(intelligent/TEST_NUMBERS)+" seconds to compute")
+    print("Brute Force took on average: "+ str(brute_force/TEST_NUMBERS)+" seconds to compute")
+    print("C Intelligent  took on average: "+ str(c_intelligent/TEST_NUMBERS)+" seconds to compute")
+    print("CUDA  took on average: "+ str(cuda/TEST_NUMBERS)+" seconds to compute")
+
 
 
 
