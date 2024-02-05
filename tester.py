@@ -5,21 +5,34 @@ import time
 import math
 import ctypes
 
-# Setup for C function
-lib = ctypes.CDLL('./libprimes.so') 
-cudalib = ctypes.CDLL('./cudaprimes.so')
-lib.compute_primes.argtypes = [ctypes.c_longlong, ctypes.POINTER(ctypes.c_longlong), ctypes.POINTER(ctypes.c_longlong)]
-lib.compute_primes.restype = None
-cudalib.compute_primes.argtypes = [ctypes.c_longlong, ctypes.POINTER(ctypes.c_longlong), ctypes.POINTER(ctypes.c_longlong)]
-cudalib.compute_primes.restype = None
-result = ctypes.c_longlong()
-factor = ctypes.c_longlong()
-
-
 # Config variables
 MIN_RANGE = 10000
 MAX_RANGE = 100000
 TEST_NUMBERS = 10
+liste = [False,True,True,True]
+
+
+
+
+
+
+
+# Setup for C functions
+if liste[1]:
+    lib = ctypes.CDLL('./libprimes.so') 
+    lib.compute_primes.argtypes = [ctypes.c_longlong, ctypes.POINTER(ctypes.c_longlong), ctypes.POINTER(ctypes.c_longlong)]
+    lib.compute_primes.restype = None
+    result = ctypes.c_longlong()
+    factor = ctypes.c_longlong()
+
+if liste[0]:
+    cudalib = ctypes.CDLL('./cudaprimes.so')
+    cudalib.compute_primes.argtypes = [ctypes.c_longlong, ctypes.POINTER(ctypes.c_longlong), ctypes.POINTER(ctypes.c_longlong)]
+    cudalib.compute_primes.restype = None
+    result = ctypes.c_longlong()
+    factor = ctypes.c_longlong()
+
+
 
 def get_prime():
     n = random.choice(primes)
@@ -30,7 +43,6 @@ def test_it():
     c_intelligent = 0
     brute_force = 0
     intelligent =  0
-    liste = [True,True,True,True]
     for k in range(TEST_NUMBERS):
         b = get_prime()
         c = get_prime()
