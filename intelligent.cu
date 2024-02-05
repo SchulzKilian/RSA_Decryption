@@ -26,17 +26,3 @@ extern "C" void compute_primes(long long x, long long* host_result) {
     cudaFree(device_result);
 }
 
-int main() {
-    long long x = 22742734291LL * 52711LL;
-    long long host_result[2] = {0};
-
-    compute_primes(x, host_result);
-
-    if (host_result[0] != 0) {
-        printf("Factor: %lld, Result: %lld\n", host_result[1], host_result[0]);
-    } else {
-        printf("No factors found.\n");
-    }
-
-    return 0;
-}
