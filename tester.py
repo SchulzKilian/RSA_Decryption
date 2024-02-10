@@ -8,7 +8,7 @@ import ctypes
 # Config variables
 MIN_RANGE = 10000
 MAX_RANGE = 100000
-TEST_NUMBERS = 10
+TEST_NUMBERS = 5
 liste = [False,True,True,True]
 
 
@@ -52,28 +52,33 @@ def test_it():
             end_time =time.time()
             assert{a,d} == {b,c}
             cuda += end_time - start_time
-            print("CUDA  took on average: "+ str(cuda/TEST_NUMBERS)+" seconds to compute")
+            if k == TEST_NUMBERS-1:
+                print("CUDA  took on average: "+ str(cuda/TEST_NUMBERS)+" seconds to compute")
         if liste[1]:
             start_time= time.time()
-            a,d = lib.compute_primes(b*c, ctypes.byref(result), ctypes.byref(factor))
+            lib.compute_primes(b*c, ctypes.byref(result), ctypes.byref(factor))
+            a,d = int(result.value), int(factor.value)
             end_time =time.time()
             assert{a,d} == {b,c}
             c_intelligent += end_time - start_time
-            print("C Intelligent  took on average: "+ str(c_intelligent/TEST_NUMBERS)+" seconds to compute")
+            if k == TEST_NUMBERS-1:
+                print("C Intelligent  took on average: "+ str(c_intelligent/TEST_NUMBERS)+" seconds to compute")
         if liste[2]:
             start_time= time.time()
             a,d =B.compute_primes(b*c)
             end_time =time.time()
             assert{a,d}== {b,c}
             brute_force += end_time - start_time
-            print("Brute Force took on average: "+ str(brute_force/TEST_NUMBERS)+" seconds to compute")
+            if k == TEST_NUMBERS-1:
+                print("Brute Force took on average: "+ str(brute_force/TEST_NUMBERS)+" seconds to compute")
         if liste[3]:
             start_time= time.time()
             a,d = I.compute_primes(b*c)
             end_time =time.time()
             assert{a,d}== {b,c}
             intelligent += end_time - start_time
-            print("Intelligent took on average: "+ str(intelligent/TEST_NUMBERS)+" seconds to compute")
+            if k == TEST_NUMBERS-1:
+                print("Intelligent took on average: "+ str(intelligent/TEST_NUMBERS)+" seconds to compute")
 
     
     
