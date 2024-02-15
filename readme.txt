@@ -1,4 +1,5 @@
 This is an attempt at a parallelized and fast way to find the two factors of a large number that has two prime factors, as needed for the RSA algorithm.
+The goal is for the parallelization to be three times as fast as the brute force in normal c.
 
 Different algorithmic attempts:
 
