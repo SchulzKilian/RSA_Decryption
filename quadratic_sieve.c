@@ -1,9 +1,14 @@
 #include <omp.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <stdbool.h>
 #include <pthread.h>
-#include <cuda_runtime.h>
+#include <math.h>
+//#include <cuda_runtime.h>
+bool is_prime(int n); // Assuming this is defined correctly elsewhere
+long long mod_exp(long long base, long long exp, long long mod); // Declare mod_exp
 
+long long* generate_factor_base(long long n, int* count);
 
 void factor_primes(long long n) {
     int count; // Number of primes in the factor base
@@ -13,17 +18,17 @@ void factor_primes(long long n) {
     long long* factor_base = generate_factor_base(n, &count);
     
     // Step 2: sieeeve
-    int* relations = perform_sieving(factor_base, count, n, &num_relations);
+    //int* relations = perform_sieving(factor_base, count, n, &num_relations);
     
     // Step 3: and then finish it off
-    solve_linear_algebra(relations, num_relations, count);
+    //solve_linear_algebra(relations, num_relations, count);
     
     // Cleanup
-    free(factor_base);
-    for (int i = 0; i < num_relations; i++) {
-        free(relations[i]);
-    }
-    free(relations);
+    //free(factor_base);
+    //for (int i = 0; i < num_relations; i++) {
+    //    free(relations[i]);
+    //}
+    //free(relations);
 }
 
 
@@ -78,7 +83,7 @@ long long* generate_factor_base(long long n, int* count) {
 }
 
 
-void perform_sieving(long long* factor_base, int factor_base_size, int range_start, int range_size) {
+/*void perform_sieving(long long* factor_base, int factor_base_size, int range_start, int range_size) {
     long long *d_factor_base;
     int *d_relations;
 
@@ -132,4 +137,35 @@ __global__ void sieve_kernel(long long *factor_base, int factor_base_size, int *
             }
         }
     }
+}
+
+*/
+
+long long mod_exp(long long base, long long exp, long long mod) {
+    long long result = 1;
+    base = base % mod;
+    while (exp > 0) {
+        // If exp is odd, multiply the base with result
+        if (exp % 2 == 1)
+            result = (result * base) % mod;
+        // Now exp must be even, square the base
+        exp = exp >> 1; // Equivalent to exp = exp / 2
+        base = (base * base) % mod;
+    }
+    return result;
+}
+
+int main() {
+    long long n = 84923; // The number to factor
+    int count;
+    long long* factor_base = generate_factor_base(n, &count);
+
+    printf("Factor base for %lld:\n", n);
+    for (int i = 0; i < count; i++) {
+        printf("%lld ", factor_base[i]);
+    }
+    printf("\nCount: %d\n", count);
+
+    free(factor_base);
+    return 0;
 }
