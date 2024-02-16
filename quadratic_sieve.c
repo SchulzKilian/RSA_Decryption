@@ -88,28 +88,31 @@ void perform_sieving(long long* factor_base, int count, long long n, int* num_re
     // Initialize num_relations to 0
     *num_relations = 0;
 
-    // Allocate a temporary array to mark numbers as smooth or not
-    // For simplicity, we'll mark a number as smooth if it's divisible by any prime in the factor base
-    // This is a simplification and may not fully align with your exact definition of "smooth"
-    bool* isSmooth = (bool*)calloc(n + 1, sizeof(bool)); // Initialized to false for all
+    // Allocate an array thing where i can check arew they smooth
+    bool* isCandidate = (bool*)calloc(n + 1, sizeof(bool)); // Initialized to true, easier
 
+    // caan i factor it?
     #pragma omp parallel for schedule(dynamic)
-    for (int i = 0; i < count; ++i) {
-        long long prime = factor_base[i];
-        for (long long multiple = prime; multiple <= n; multiple += prime) {
-            isSmooth[multiple] = true; // Mark multiples of the prime as "smooth"
-        }
-    }
-
-    // Count the number of smooth numbers
     for (long long i = 2; i <= n; ++i) {
-        if (isSmooth[i]) {
+        long long num = i;
+        for (int j = 0; j < count && num > 1; ++j) {
+            long long prime = factor_base[j];
+            while (num % prime == 0) {
+                num /= prime; // Divide by prime as much as possible
+            }
+        }
+        // If num is reduced to 1, all its factors are in the factor base
+        if (num == 1) {
             #pragma omp atomic
             (*num_relations)++;
+            #pragma omp critical
+            {
+                printf("%lld ", i); // Print smooth numbers
+            }
         }
     }
 
-    free(isSmooth);
+    free(isCandidate);
 }
 
 
