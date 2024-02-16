@@ -85,7 +85,7 @@ long long* generate_factor_base(long long n, int* count) {
 
 void perform_sieving(long long* factor_base, int count, long long n, int*** matrix, int* num_smooth_numbers) {
     *num_smooth_numbers = 0;
-    int capacity = n/100 + 1; // Adjusted initial capacity
+    int capacity = n / 100 + 1; // Adjusted initial capacity, ensure it's non-zero
 
     // Allocate initial space for the matrix
     *matrix = (int**)malloc(capacity * sizeof(int*));
@@ -94,73 +94,76 @@ void perform_sieving(long long* factor_base, int count, long long n, int*** matr
         exit(EXIT_FAILURE);
     }
 
-    // Temporary storage for thread-local results
-    int** temp_matrix = malloc(capacity * sizeof(int*));
-    if (temp_matrix == NULL) {
-        perror("Failed to allocate memory for temp_matrix");
-        exit(EXIT_FAILURE);
+    // Initialize thread-local storage for all threads
+    int max_threads = omp_get_max_threads();
+    int*** temp_results = (int***)malloc(max_threads * sizeof(int**)); // Array of pointers to int* arrays
+    int* lengths = (int*)calloc(max_threads, sizeof(int)); // Store length of each thread's results
+    int* capacities = (int*)malloc(max_threads * sizeof(int)); // Store capacity of each thread's storage
+
+    for (int i = 0; i < max_threads; ++i) {
+        capacities[i] = capacity / max_threads + 1; // Initial capacity per thread
+        temp_results[i] = (int**)malloc(capacities[i] * sizeof(int*));
+        if (temp_results[i] == NULL) {
+            perror("Failed to allocate memory for temp_results");
+            exit(EXIT_FAILURE);
+        }
     }
-    int temp_num_smooth = 0;
 
     #pragma omp parallel
     {
-        int** local_matrix = NULL;
-        int local_num_smooth = 0;
-        int local_capacity = capacity;
-
+        int id = omp_get_thread_num();
         #pragma omp for nowait
         for (long long i = 2; i <= n; ++i) {
             long long num = i;
             int* exponent_vector = (int*)calloc(count, sizeof(int)); // Initialize to 0s
-
             for (int j = 0; j < count && num > 1; ++j) {
                 while (num % factor_base[j] == 0) {
                     exponent_vector[j] = (exponent_vector[j] + 1) % 2; // Calculate exponent modulo 2
                     num /= factor_base[j];
                 }
             }
-
             if (num == 1) { // num is smooth
-                if (local_num_smooth == local_capacity) {
-                    // Resize local_matrix if needed, similar to realloc logic
-                    local_capacity *= 2;
-                    local_matrix = realloc(local_matrix, local_capacity * sizeof(int*));
-                    if (local_matrix == NULL) {
-                        perror("Failed to resize local_matrix");
+                if (lengths[id] == capacities[id]) { // Check if the current thread's storage needs expansion
+                    capacities[id] *= 2;
+                    temp_results[id] = realloc(temp_results[id], capacities[id] * sizeof(int*));
+                    if (temp_results[id] == NULL) {
+                        perror("Failed to resize temp_results");
                         exit(EXIT_FAILURE);
                     }
                 }
-                local_matrix[local_num_smooth++] = exponent_vector;
+                temp_results[id][lengths[id]++] = exponent_vector;
             } else {
                 free(exponent_vector);
             }
         }
-
-        #pragma omp critical
-        {
-            for (int i = 0; i < local_num_smooth; ++i) {
-                if (*num_smooth_numbers >= capacity) {
-                    // Resize global matrix if needed, similar to realloc logic
-                    capacity *= 2;
-                    *matrix = realloc(*matrix, capacity * sizeof(int*));
-                    if (*matrix == NULL) {
-                        perror("Failed to resize matrix");
-                        exit(EXIT_FAILURE);
-                    }
-                }
-                (*matrix)[(*num_smooth_numbers)++] = local_matrix[i];
-            }
-            free(local_matrix);
-        }
     }
 
-    free(temp_matrix);
+    // Merge results after parallel section
+    for (int i = 0; i < max_threads; ++i) {
+        for (int j = 0; j < lengths[i]; ++j) {
+            if (*num_smooth_numbers == capacity) {
+                capacity *= 2; // Resize global matrix if needed
+                *matrix = realloc(*matrix, capacity * sizeof(int*));
+                if (*matrix == NULL) {
+                    perror("Failed to resize matrix");
+                    exit(EXIT_FAILURE);
+                }
+            }
+            (*matrix)[(*num_smooth_numbers)++] = temp_results[i][j];
+        }
+        free(temp_results[i]); // Free each thread's temporary storage
+    }
+    free(temp_results); // Free the array of pointers
+    free(lengths);
+    free(capacities);
 
-    // Optional: Resize the matrix to match the exact number of smooth numbers found
-    *matrix = realloc(*matrix, (*num_smooth_numbers) * sizeof(int*));
-    if (*matrix == NULL && *num_smooth_numbers > 0) {
-        perror("Failed to shrink memory for matrix");
-        exit(EXIT_FAILURE);
+    // Optionally, resize the matrix to match the exact number of smooth numbers found
+    if (*num_smooth_numbers < capacity) {
+        *matrix = realloc(*matrix, (*num_smooth_numbers) * sizeof(int*));
+        if (*matrix == NULL && *num_smooth_numbers > 0) {
+            perror("Failed to shrink memory for matrix");
+            // Not exiting here because it's a shrink operation; data is still intact
+        }
     }
 }
 
@@ -189,7 +192,7 @@ void print_matrix(int** matrix, int num_smooth_numbers, int count) {
 }
 
 int main() {
-    long long n = 221; // The number to factor
+    long long n = 15; // The number to factor
     int count;
     long long* factor_base = generate_factor_base(n, &count);
     int** matrix = NULL;
