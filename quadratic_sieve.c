@@ -198,7 +198,7 @@ int main() {
     perform_sieving(factor_base, count, n, &matrix, &num_smooth_numbers);
 
 
-    //print_matrix(matrix, num_smooth_numbers, count);
+    print_matrix(matrix, num_smooth_numbers, count);
 
     
 
