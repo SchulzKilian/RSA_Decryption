@@ -4,11 +4,11 @@
 #include <stdbool.h>
 #include <pthread.h>
 #include <math.h>
-#include <cuda_runtime.h>
 
-bool is_prime(int n); // Assuming this is defined correctly elsewhere
+
+bool is_prime(int n); 
 long long mod_exp(long long base, long long exp, long long mod); // Declare mod_exp
-
+void perform_sieving(long long* factor_base, int count, long long n, int* num_relations);
 long long* generate_factor_base(long long n, int* count);
 
 void factor_primes(long long n) {
@@ -19,17 +19,17 @@ void factor_primes(long long n) {
     long long* factor_base = generate_factor_base(n, &count);
     
     // Step 2: sieeeve
-    int* relations = perform_sieving(factor_base, count, n, &num_relations);
+    perform_sieving(factor_base, count, n, &num_relations);
     
     // Step 3: and then finish it off
-    solve_linear_algebra(relations, num_relations, count);
+    //solve_linear_algebra(relations, num_relations, count);
     
     // Cleanup
-    free(factor_base);
+    /*free(factor_base);
     for (int i = 0; i < num_relations; i++) {
         free(relations[i]);
     }
-    free(relations);
+    free(relations);*/
 }
 
 
@@ -84,61 +84,33 @@ long long* generate_factor_base(long long n, int* count) {
 }
 
 
-void perform_sieving(long long* factor_base, int factor_base_size, int range_start, int range_size) {
-    long long *d_factor_base;
-    int *d_relations;
+void perform_sieving(long long* factor_base, int count, long long n, int* num_relations) {
+    // Initialize num_relations to 0
+    *num_relations = 0;
 
-    // Allocate GPU memory
-    cudaMalloc(&d_factor_base, factor_base_size * sizeof(long long));
-    cudaMalloc(&d_relations, range_size * factor_base_size * sizeof(int));
+    // Allocate a temporary array to mark numbers as smooth or not
+    // For simplicity, we'll mark a number as smooth if it's divisible by any prime in the factor base
+    // This is a simplification and may not fully align with your exact definition of "smooth"
+    bool* isSmooth = (bool*)calloc(n + 1, sizeof(bool)); // Initialized to false for all
 
-    // Copy factor base to GPU
-    cudaMemcpy(d_factor_base, factor_base, factor_base_size * sizeof(long long), cudaMemcpyHostToDevice);
-
-    // Kernel launch parameters
-    int threadsPerBlock = 256;
-    int blocksPerGrid = (range_size + threadsPerBlock - 1) / threadsPerBlock;
-
-    // Launch the kernel
-    sieve_kernel<<<blocksPerGrid, threadsPerBlock>>>(d_factor_base, factor_base_size, d_relations, range_start, range_size);
-
-    // Allocate host memory for relations and copy back from GPU
-    int* relations = (int*)malloc(range_size * factor_base_size * sizeof(int));
-    cudaMemcpy(relations, d_relations, range_size * factor_base_size * sizeof(int), cudaMemcpyDeviceToHost);
-
-    // Process the relations here...
-    // Example: Print out relations for each smooth number
-    for (int i = 0; i < range_size; ++i) {
-        std::cout << "Relations for number " << (range_start + i) << ": ";
-        for (int j = 0; j < factor_base_size; ++j) {
-            std::cout << relations[i * factor_base_size + j] << " ";
+    #pragma omp parallel for schedule(dynamic)
+    for (int i = 0; i < count; ++i) {
+        long long prime = factor_base[i];
+        for (long long multiple = prime; multiple <= n; multiple += prime) {
+            isSmooth[multiple] = true; // Mark multiples of the prime as "smooth"
         }
-        std::cout << "\n";
     }
 
-    // Cleanup
-    cudaFree(d_factor_base);
-    cudaFree(d_relations);
-    free(relations);
-}
-
-
-__global__ void sieve_kernel(long long *d_factor_base, int factor_base_size, char *d_sieve_array, long long range_start, long long range_size) {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    long long num = range_start + index;
-
-    if (index < range_size) {
-        char isSmooth = 1; // Assume the number is smooth until proven otherwise
-        for (int j = 0; j < factor_base_size; j++) {
-            if (num % d_factor_base[j] != 0) {
-                isSmooth = 0; // If num is not divisible by a prime in the factor base, it's not smooth
-                break;
-            }
+    // Count the number of smooth numbers
+    for (long long i = 2; i <= n; ++i) {
+        if (isSmooth[i]) {
+            #pragma omp atomic
+            (*num_relations)++;
         }
-        d_sieve_array[index] = isSmooth; // Mark the number as smooth or not
     }
-}
 
+    free(isSmooth);
+}
 
 
 long long mod_exp(long long base, long long exp, long long mod) {
@@ -156,7 +128,7 @@ long long mod_exp(long long base, long long exp, long long mod) {
 }
 
 int main() {
-    long long n = 84923; // The number to factor
+    long long n = 30; // The number to factor
     int count;
     long long* factor_base = generate_factor_base(n, &count);
 
@@ -164,7 +136,19 @@ int main() {
     for (int i = 0; i < count; i++) {
         printf("%lld ", factor_base[i]);
     }
-    printf("\nCount: %d\n", count);
+    printf("\nCount of primes in factor base: %d\n", count);
+
+    // Additions for perform_sieving verification
+    int num_relations;
+    perform_sieving(factor_base, count, n, &num_relations);
+    printf("Number of smooth numbers up to %lld: %d\n", n, num_relations);
+
+
+    if (num_relations == 7) {
+        printf("The sieving process found the right amount ofsmooth numbers, which suggests it is working.\n");
+    } else {
+        printf("Not the right smooth numbers found. There may be an issue with the sieving process or the factor base.\n");
+    }
 
     free(factor_base);
     return 0;
