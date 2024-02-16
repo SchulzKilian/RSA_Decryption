@@ -4,7 +4,8 @@
 #include <stdbool.h>
 #include <pthread.h>
 #include <math.h>
-//#include <cuda_runtime.h>
+#include <cuda_runtime.h>
+
 bool is_prime(int n); // Assuming this is defined correctly elsewhere
 long long mod_exp(long long base, long long exp, long long mod); // Declare mod_exp
 
@@ -18,17 +19,17 @@ void factor_primes(long long n) {
     long long* factor_base = generate_factor_base(n, &count);
     
     // Step 2: sieeeve
-    //int* relations = perform_sieving(factor_base, count, n, &num_relations);
+    int* relations = perform_sieving(factor_base, count, n, &num_relations);
     
     // Step 3: and then finish it off
-    //solve_linear_algebra(relations, num_relations, count);
+    solve_linear_algebra(relations, num_relations, count);
     
     // Cleanup
-    //free(factor_base);
-    //for (int i = 0; i < num_relations; i++) {
-    //    free(relations[i]);
-    //}
-    //free(relations);
+    free(factor_base);
+    for (int i = 0; i < num_relations; i++) {
+        free(relations[i]);
+    }
+    free(relations);
 }
 
 
@@ -83,7 +84,7 @@ long long* generate_factor_base(long long n, int* count) {
 }
 
 
-/*void perform_sieving(long long* factor_base, int factor_base_size, int range_start, int range_size) {
+void perform_sieving(long long* factor_base, int factor_base_size, int range_start, int range_size) {
     long long *d_factor_base;
     int *d_relations;
 
@@ -122,24 +123,23 @@ long long* generate_factor_base(long long n, int* count) {
 }
 
 
-__global__ void sieve_kernel(long long *factor_base, int factor_base_size, int *relations, int range_start, int range_size) {
+__global__ void sieve_kernel(long long *d_factor_base, int factor_base_size, char *d_sieve_array, long long range_start, long long range_size) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride = blockDim.x * gridDim.x;
-    
-    for (int i = index; i < range_size; i += stride) {
-        int num = range_start + i;
+    long long num = range_start + index;
+
+    if (index < range_size) {
+        char isSmooth = 1; // Assume the number is smooth until proven otherwise
         for (int j = 0; j < factor_base_size; j++) {
-            if (num % factor_base[j] == 0) {
-                // Mark this prime as dividing the number
-                relations[i * factor_base_size + j] = 1;
-            } else {
-                relations[i * factor_base_size + j] = 0;
+            if (num % d_factor_base[j] != 0) {
+                isSmooth = 0; // If num is not divisible by a prime in the factor base, it's not smooth
+                break;
             }
         }
+        d_sieve_array[index] = isSmooth; // Mark the number as smooth or not
     }
 }
 
-*/
+
 
 long long mod_exp(long long base, long long exp, long long mod) {
     long long result = 1;
