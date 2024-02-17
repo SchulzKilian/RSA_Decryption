@@ -250,9 +250,6 @@ int main() {
     int* d_csrColInd;
     printf("Number of smooth numbers: %d\n", num_smooth_numbers);
     printf("Value of count: %d\n", count); 
-    cudaMalloc((void **)&d_csrRowPtr, sizeof(int) * (num_smooth_numbers + 1)); // Allocate space for CSR row pointers on device
-    cudaMalloc((void **)&d_csrColInd, sizeof(int) * nnz); // Allocate space for CSR column indices on device
-
     cudaError_t transferStatus = transferMatrixToDevice(csrRowPtr, csrColInd, num_smooth_numbers, count, nnz, &d_csrRowPtr, &d_csrColInd);
     if (transferStatus != cudaSuccess) {
         printf("Error transferring matrix to device: %s\n", cudaGetErrorString(transferStatus));
