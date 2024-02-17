@@ -225,10 +225,6 @@ cudaError_t transferMatrixToCSRDevice(int** hostMatrix, int numRows, int numCols
     status = cudaMalloc((void**)d_csrVal, nnz * sizeof(float));
     if (status != cudaSuccess) return status;
 
-    // Your existing cudaMemcpy calls...
-
-    return status; // Assuming you have appropriate error handling
-}
     // Copy CSR components from host to device
     status = cudaMemcpy(*d_csrRowPtr, csrRowPtr, (numRows + 1) * sizeof(int), cudaMemcpyHostToDevice);
     if (status != cudaSuccess) goto cleanup;
