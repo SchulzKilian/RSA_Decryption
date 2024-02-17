@@ -31,6 +31,15 @@ void factor_primes(long long n) {
     }
     free(relations);*/
 }
+
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
+   if (code != cudaSuccess) {
+      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
+
 void copyMatrixToGPU(int** hostMatrix, int num_rows, int num_cols, int** deviceFlatMatrix) {
     int totalSize = num_rows * num_cols * sizeof(int);
     
@@ -205,13 +214,7 @@ int* flattenMatrix(int** matrix, int rows, int cols) {
     return flatMatrix;
 }
 
-#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
-   if (code != cudaSuccess) {
-      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-      if (abort) exit(code);
-   }
-}
+
 
 
 void print_matrix(int** matrix, int num_smooth_numbers, int count) {
@@ -235,7 +238,7 @@ int main() {
 
     int* deviceFlatMatrix;
     copyMatrixToGPU(matrix,num_smooth_numbers,count,&deviceFlatMatrix)
-    print_matrix(matrix, num_smooth_numbers, count);
+    //print_matrix(matrix, num_smooth_numbers, count);
 
     
 
