@@ -195,9 +195,9 @@ cudaError_t transferMatrixToCSRAndToDevice(int** denseMatrix, int numRows, int n
     // Allocate host memory for CSR format
     int* csrRowPtr = (int*)malloc((numRows + 1) * sizeof(int));
     int* csrColInd = (int*)malloc(nnz * sizeof(int));
-    float* csrValues = (float*)malloc(nnz * sizeof(float)); // Assuming values are float, change if different
 
-    if (!csrRowPtr || !csrColInd || !csrValues) {
+
+    if (!csrRowPtr || !csrColInd) {
         // Handle memory allocation failure
         fprintf(stderr, "Failed to allocate host memory for CSR arrays\n");
         return cudaErrorMemoryAllocation; // Use appropriate CUDA error
@@ -210,7 +210,6 @@ cudaError_t transferMatrixToCSRAndToDevice(int** denseMatrix, int numRows, int n
         for (int j = 0; j < numCols; ++j) {
             if (denseMatrix[i][j] != 0) {
                 csrColInd[count] = j;
-                csrValues[count] = 1
                 count++;
             }
         }
@@ -232,13 +231,6 @@ cudaError_t transferMatrixToCSRAndToDevice(int** denseMatrix, int numRows, int n
         return status;
     }
 
-    status = cudaMalloc((void**)d_csrValues, nnz * sizeof(float));
-    if (status != cudaSuccess) {
-        cudaFree(*d_csrRowPtr);
-        cudaFree(*d_csrColInd);
-        fprintf(stderr, "Failed to allocate device memory for CSR values\n");
-        return status;
-    }
 
     // Copy CSR data from host to device
     status = cudaMemcpy(*d_csrRowPtr, csrRowPtr, (numRows + 1) * sizeof(int), cudaMemcpyHostToDevice);
