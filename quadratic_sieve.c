@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <pthread.h>
 #include <math.h>
+#include <cuda_runtime.h>
 
 
 bool is_prime(int n); 
@@ -179,6 +180,40 @@ long long mod_exp(long long base, long long exp, long long mod) {
         base = (base * base) % mod;
     }
     return result;
+}
+
+
+cudaError_t transferMatrixToDevice(int** hostMatrix, int numRows, int numCols, int** deviceMatrix) {
+    int* flatMatrix = NULL;
+    size_t size = numRows * numCols * sizeof(int);
+    
+    // Allocate flat matrix on host
+    flatMatrix = (int*)malloc(size);
+    if (flatMatrix == NULL) {
+        return cudaErrorMemoryAllocation;
+    }
+
+    // Flatten the matrix
+    for (int i = 0; i < numRows; i++) {
+        for (int j = 0; j < numCols; j++) {
+            flatMatrix[i * numCols + j] = hostMatrix[i][j];
+        }
+    }
+
+    // Allocate memory on the device
+    cudaError_t status = cudaMalloc(deviceMatrix, size);
+    if (status != cudaSuccess) {
+        free(flatMatrix); // Cleanup
+        return status;
+    }
+
+    // Copy matrix from host to device
+    status = cudaMemcpy(*deviceMatrix, flatMatrix, size, cudaMemcpyHostToDevice);
+    
+    // Free the flat matrix on the host
+    free(flatMatrix);
+
+    return status;
 }
 
 void print_matrix(int** matrix, int num_smooth_numbers, int count) {
