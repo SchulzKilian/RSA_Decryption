@@ -209,6 +209,9 @@ cudaError_t transferMatrixToDevice(int* csrRowPtr, int* csrColInd, int numRows, 
 
     status = cudaMemcpy(*d_csrRowPtr, csrRowPtr, (numRows + 1) * sizeof(int), cudaMemcpyHostToDevice);
     if (status != cudaSuccess) {
+if (*d_csrRowPtr == NULL || csrRowPtr == NULL) {
+    fprintf(stderr, "One of the pointers is NULL.\n");
+}
         fprintf(stderr, "copy csr row failed: %s\n", cudaGetErrorString(status));
         cudaFree(*d_csrRowPtr);
         cudaFree(*d_csrColInd);
