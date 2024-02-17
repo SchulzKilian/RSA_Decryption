@@ -194,6 +194,7 @@ cudaError_t transferMatrixToDevice(int* csrRowPtr, int* csrColInd, int numRows, 
     // Allocate memory for CSR row pointers on the device
     status = cudaMalloc((void **)d_csrRowPtr, (numRows + 1) * sizeof(int));
     if (status != cudaSuccess) {
+        fprintf(stderr, "allocate csr row failed: %s\n", cudaGetErrorString(status));
         return status;
     }
 
@@ -201,6 +202,7 @@ cudaError_t transferMatrixToDevice(int* csrRowPtr, int* csrColInd, int numRows, 
     status = cudaMalloc((void **)d_csrColInd, nnz * sizeof(int));
     if (status != cudaSuccess) {
         cudaFree(*d_csrRowPtr);  // Free memory for CSR row pointers if allocation for CSR column indices fails
+        fprintf(stderr, "allocate csr column failed: %s\n", cudaGetErrorString(status));
         return status;
     }
 
@@ -209,6 +211,7 @@ cudaError_t transferMatrixToDevice(int* csrRowPtr, int* csrColInd, int numRows, 
     if (status != cudaSuccess) {
         cudaFree(*d_csrRowPtr);
         cudaFree(*d_csrColInd);
+        fprintf(stderr, "copy csr row failed: %s\n", cudaGetErrorString(status));
         return status;
     }
 
@@ -217,6 +220,7 @@ cudaError_t transferMatrixToDevice(int* csrRowPtr, int* csrColInd, int numRows, 
     if (status != cudaSuccess) {
         cudaFree(*d_csrRowPtr);
         cudaFree(*d_csrColInd);
+        fprintf(stderr, "copy csr column indices failed: %s\n", cudaGetErrorString(status));
         return status;
     }
 
