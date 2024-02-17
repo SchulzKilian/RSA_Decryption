@@ -31,7 +31,21 @@ void factor_primes(long long n) {
     }
     free(relations);*/
 }
+void copyMatrixToGPU(int** hostMatrix, int num_rows, int num_cols, int** deviceFlatMatrix) {
+    int totalSize = num_rows * num_cols * sizeof(int);
+    
+    // Allocate flat array on GPU
+    int* d_flatMatrix;
+    gpuErrchk(cudaMalloc((void**)&d_flatMatrix, totalSize));
 
+    // Copy row by row
+    for (int i = 0; i < num_rows; ++i) {
+        gpuErrchk(cudaMemcpy(d_flatMatrix + i * num_cols, hostMatrix[i], num_cols * sizeof(int), cudaMemcpyHostToDevice));
+    }
+
+    // Copy device pointer back
+    *deviceFlatMatrix = d_flatMatrix;
+}
 
 
 
@@ -181,40 +195,24 @@ long long mod_exp(long long base, long long exp, long long mod) {
     }
     return result;
 }
-
-
-cudaError_t transferMatrixToDevice(int** hostMatrix, int numRows, int numCols, int** deviceMatrix) {
-    int* flatMatrix = NULL;
-    size_t size = numRows * numCols * sizeof(int);
-    
-    // Allocate flat matrix on host
-    flatMatrix = (int*)malloc(size);
-    if (flatMatrix == NULL) {
-        return cudaErrorMemoryAllocation;
-    }
-
-    // Flatten the matrix
-    for (int i = 0; i < numRows; i++) {
-        for (int j = 0; j < numCols; j++) {
-            flatMatrix[i * numCols + j] = hostMatrix[i][j];
+int* flattenMatrix(int** matrix, int rows, int cols) {
+    int* flatMatrix = (int*)malloc(rows * cols * sizeof(int));
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            flatMatrix[i * cols + j] = matrix[i][j];
         }
     }
-
-    // Allocate memory on the device
-    cudaError_t status = cudaMalloc(deviceMatrix, size);
-    if (status != cudaSuccess) {
-        free(flatMatrix); // Cleanup
-        return status;
-    }
-
-    // Copy matrix from host to device
-    status = cudaMemcpy(*deviceMatrix, flatMatrix, size, cudaMemcpyHostToDevice);
-    
-    // Free the flat matrix on the host
-    free(flatMatrix);
-
-    return status;
+    return flatMatrix;
 }
+
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
+   if (code != cudaSuccess) {
+      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
+
 
 void print_matrix(int** matrix, int num_smooth_numbers, int count) {
     printf("Matrix of Exponent Vectors Modulo 2:\n");
@@ -235,7 +233,8 @@ int main() {
 
     perform_sieving(factor_base, count, n, &matrix, &num_smooth_numbers);
 
-
+    int* deviceFlatMatrix;
+    copyMatrixToGPU(matrix,num_smooth_numbers,count,&deviceFlatMatrix)
     print_matrix(matrix, num_smooth_numbers, count);
 
     
