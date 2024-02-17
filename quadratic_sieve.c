@@ -243,8 +243,8 @@ int main() {
     int nnz;
 
     perform_sieving(factor_base, count, n, &matrix, &num_smooth_numbers, &nnz);
-    int* csrRowPtr; // Pointer to CSR row pointers array on the host
-    int* csrColInd; // Pointer to CSR column indices array on the host
+    int* csrRowPtr = NULL; // Pointer to CSR row pointers array on the host
+    int* csrColInd = NULL; // Pointer to CSR column indices array on the host
     fprintf(stdout, "Number of non-zero elements: %d\n", nnz);
     int* d_csrRowPtr; 
     int* d_csrColInd;
