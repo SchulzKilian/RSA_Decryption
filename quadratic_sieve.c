@@ -31,6 +31,7 @@ void factor_primes(long long n) {
     }
     free(relations);*/
 }
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__, true); }
 
 void gpuAssert(cudaError_t code, const char *file, int line, bool abort) {
    if (code != cudaSuccess) {
