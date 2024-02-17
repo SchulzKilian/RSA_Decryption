@@ -206,17 +206,12 @@ cudaError_t transferMatrixToDevice(int* csrRowPtr, int* csrColInd, int numRows, 
         return status;
     }
 
-    // Copy CSR row pointers from host to device
-    printf("csrRowPtr on host before cudaMemcpy:\n");
-    for (int i = 0; i <= numRows; ++i) {
-        printf("%d ", csrRowPtr[i]);
-}
-    printf("\n");
+
     status = cudaMemcpy(*d_csrRowPtr, csrRowPtr, (numRows + 1) * sizeof(int), cudaMemcpyHostToDevice);
     if (status != cudaSuccess) {
+        fprintf(stderr, "copy csr row failed: %s\n", cudaGetErrorString(status));
         cudaFree(*d_csrRowPtr);
         cudaFree(*d_csrColInd);
-
         return status;
     }
 
@@ -229,7 +224,7 @@ cudaError_t transferMatrixToDevice(int* csrRowPtr, int* csrColInd, int numRows, 
         return status;
     }
 
-    return cudaSuccess;
+    return cudaSuccess; 
 }
 
 
