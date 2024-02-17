@@ -19,7 +19,7 @@ void factor_primes(long long n) {
     int num_smooth_numbers = 0;
     
     // Step 2: sieeeve
-    perform_sieving(factor_base, count, n, &matrix, &num_smooth_numbers);
+    //perform_sieving(factor_base, count, n, &matrix, &num_smooth_numbers);
     
     // Step 3: and then finish it off
     //solve_linear_algebra(relations, num_relations, count);
@@ -188,22 +188,24 @@ long long mod_exp(long long base, long long exp, long long mod) {
 }
 
 
-cudaError_t transferMatrixToDevice(int** csrRowPtr, int** csrColInd, int numRows, int numCols, int nnz, int** d_csrRowPtr, int** d_csrColInd) {
+cudaError_t transferMatrixToDevice(int* csrRowPtr, int* csrColInd, int numRows, int numCols, int nnz, int** d_csrRowPtr, int** d_csrColInd) {
+    cudaError_t status;
+
     // Allocate memory for CSR row pointers on the device
-    cudaError_t status = cudaMalloc(d_csrRowPtr, (numRows + 1) * sizeof(int));
+    status = cudaMalloc((void **)d_csrRowPtr, (numRows + 1) * sizeof(int));
     if (status != cudaSuccess) {
         return status;
     }
 
     // Allocate memory for CSR column indices on the device
-    status = cudaMalloc(d_csrColInd, nnz * sizeof(int));
+    status = cudaMalloc((void **)d_csrColInd, nnz * sizeof(int));
     if (status != cudaSuccess) {
         cudaFree(*d_csrRowPtr);  // Free memory for CSR row pointers if allocation for CSR column indices fails
         return status;
     }
 
     // Copy CSR row pointers from host to device
-    status = cudaMemcpy(*d_csrRowPtr, *csrRowPtr, (numRows + 1) * sizeof(int), cudaMemcpyHostToDevice);
+    status = cudaMemcpy(*d_csrRowPtr, csrRowPtr, (numRows + 1) * sizeof(int), cudaMemcpyHostToDevice);
     if (status != cudaSuccess) {
         cudaFree(*d_csrRowPtr);
         cudaFree(*d_csrColInd);
@@ -211,7 +213,7 @@ cudaError_t transferMatrixToDevice(int** csrRowPtr, int** csrColInd, int numRows
     }
 
     // Copy CSR column indices from host to device
-    status = cudaMemcpy(*d_csrColInd, *csrColInd, nnz * sizeof(int), cudaMemcpyHostToDevice);
+    status = cudaMemcpy(*d_csrColInd, csrColInd, nnz * sizeof(int), cudaMemcpyHostToDevice);
     if (status != cudaSuccess) {
         cudaFree(*d_csrRowPtr);
         cudaFree(*d_csrColInd);
@@ -220,6 +222,7 @@ cudaError_t transferMatrixToDevice(int** csrRowPtr, int** csrColInd, int numRows
 
     return cudaSuccess;
 }
+
 
 void print_matrix(int** matrix, int num_smooth_numbers, int count) {
     printf("Matrix of Exponent Vectors Modulo 2:\n");
