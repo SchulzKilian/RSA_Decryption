@@ -237,7 +237,7 @@ int main() {
     perform_sieving(factor_base, count, n, &matrix, &num_smooth_numbers);
 
     int* deviceFlatMatrix;
-    copyMatrixToGPU(matrix,num_smooth_numbers,count,&deviceFlatMatrix)
+    copyMatrixToGPU(matrix,num_smooth_numbers,count,&deviceFlatMatrix);
     //print_matrix(matrix, num_smooth_numbers, count);
 
     
