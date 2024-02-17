@@ -218,13 +218,17 @@ cudaError_t transferMatrixToCSRDevice(int** hostMatrix, int numRows, int numCols
 
     // Allocate memory on the device for CSR components
     cudaError_t status;
-    status = cudaMalloc(d_csrRowPtr, (numRows + 1) * sizeof(int));
-    if (status != cudaSuccess) goto cleanup;
-    status = cudaMalloc(d_csrColInd, nnz * sizeof(int));
-    if (status != cudaSuccess) goto cleanup;
-    status = cudaMalloc(d_csrVal, nnz * sizeof(float));
-    if (status != cudaSuccess) goto cleanup;
+    status = cudaMalloc((void**)d_csrRowPtr, (numRows + 1) * sizeof(int));
+    if (status != cudaSuccess) return status;
+    status = cudaMalloc((void**)d_csrColInd, nnz * sizeof(int));
+    if (status != cudaSuccess) return status;
+    status = cudaMalloc((void**)d_csrVal, nnz * sizeof(float));
+    if (status != cudaSuccess) return status;
 
+    // Your existing cudaMemcpy calls...
+
+    return status; // Assuming you have appropriate error handling
+}
     // Copy CSR components from host to device
     status = cudaMemcpy(*d_csrRowPtr, csrRowPtr, (numRows + 1) * sizeof(int), cudaMemcpyHostToDevice);
     if (status != cudaSuccess) goto cleanup;
@@ -264,18 +268,19 @@ int main() {
     float* d_csrVal = NULL;
 
     cudaError_t status = transferMatrixToCSRDevice(matrix, num_smooth_numbers, count, &d_csrRowPtr, &d_csrColInd, &d_csrVal);
-    if (status != cudaSuccess) {
-        fprintf(stderr, "CUDA error: %s\n", cudaGetErrorString(status));
-        // Handle error...
+    if (status == cudaSuccess) {
+        fprintf(stdout, "Success\n");
     } else {
-        fprintf("Success");
+        fprintf(stderr, "CUDA error: %s\n", cudaGetErrorString(status));
     }
 
     for (int i = 0; i < num_smooth_numbers; ++i) {
         free(matrix[i]); 
     }
     free(matrix); 
-
+    cudaFree(d_csrRowPtr);
+    cudaFree(d_csrColInd);
+    cudaFree(d_csrVal);
     free(factor_base);
     return 0;
 }
