@@ -34,46 +34,10 @@ void factor_primes(long long n) {
     }
     free(relations);*/
 }
-#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__, true); }
 
-void gpuAssert(cudaError_t code, const char *file, int line, bool abort) {
-   if (code != cudaSuccess) {
-      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-      if (abort) exit(code);
-   }
-}
 
-void setupAndSolveBinaryMatrix(int* h_csrRowPtr, int* h_csrColInd, int numRows, int nnz, float* h_b, float* h_x) {
-    cusparseHandle_t cusparseHandle;
-    cusparseCreate(&cusparseHandle);
 
-    // Allocate memory on the device
-    int *d_csrRowPtr, *d_csrColInd;
-    float *d_b, *d_x;
-    cudaMalloc((void**)&d_csrRowPtr, (numRows + 1) * sizeof(int));
-    cudaMalloc((void**)&d_csrColInd, nnz * sizeof(int));
-    cudaMalloc((void**)&d_b, numRows * sizeof(float));
-    cudaMalloc((void**)&d_x, numRows * sizeof(float));
 
-    // Copy data to the device
-    cudaMemcpy(d_csrRowPtr, h_csrRowPtr, (numRows + 1) * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_csrColInd, h_csrColInd, nnz * sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_b, h_b, numRows * sizeof(float), cudaMemcpyHostToDevice);
-
-    // Assuming the solve operation here; specifics depend on your solver approach
-    // For example, using cuSPARSE operations to perform the matrix-vector multiplication
-    // and your own iterative solver since cuSPARSE doesn't directly solve Ax = b for binary matrices
-
-    // Copy the solution back to host
-    cudaMemcpy(h_x, d_x, numRows * sizeof(float), cudaMemcpyDeviceToHost);
-
-    // Cleanup
-    cudaFree(d_csrRowPtr);
-    cudaFree(d_csrColInd);
-    cudaFree(d_b);
-    cudaFree(d_x);
-    cusparseDestroy(cusparseHandle);
-}
 // very inefficient will change soon to eristo something prime generation
 bool is_prime(int n) {
     if (n <= 1) return false;
@@ -206,28 +170,33 @@ long long mod_exp(long long base, long long exp, long long mod) {
     }
     return result;
 }
-int* flattenMatrix(int** matrix, int rows, int cols) {
-    int* flatMatrix = (int*)malloc(rows * cols * sizeof(int));
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            flatMatrix[i * cols + j] = matrix[i][j];
+
+
+cudaError_t transferMatrixToDevice(int** hostMatrix, int numRows, int numCols, int** deviceMatrix) {
+    int* flatMatrix = NULL;
+    size_t size = numRows * numCols * sizeof(int);
+    
+    // Allocate flat matrix on host
+    flatMatrix = (int*)malloc(size);
+    if (flatMatrix == NULL) {
+        return cudaErrorMemoryAllocation;
+    }
+
+    // Flatten the matrix
+    for (int i = 0; i < numRows; i++) {
+        for (int j = 0; j < numCols; j++) {
+            flatMatrix[i * numCols + j] = hostMatrix[i][j];
         }
     }
     return flatMatrix;
 }
 
-void printCSRContents(int* csrRowPtr, int rowPtrSize, int* csrColInd, int colIndSize) {
-    printf("csrRowPtr:\n");
-    for (int i = 0; i < rowPtrSize; i++) {
-        printf("%d ", csrRowPtr[i]);
-    }
-    printf("\n");
-
-    printf("csrColInd:\n");
-    for (int i = 0; i < colIndSize; i++) {
-        printf("%d ", csrColInd[i]);
-    }
-    printf("\n");
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
+   if (code != cudaSuccess) {
+      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
 }
 
 
@@ -256,8 +225,8 @@ int main() {
     printCSRContents(csrRowPtr,csrColInd)
 
     int* deviceFlatMatrix;
-    //copyMatrixToGPU(matrix,num_smooth_numbers,count,&deviceFlatMatrix);
-    //print_matrix(matrix, num_smooth_numbers, count);
+    copyMatrixToGPU(matrix,num_smooth_numbers,count,&deviceFlatMatrix)
+    print_matrix(matrix, num_smooth_numbers, count);
 
     
 
