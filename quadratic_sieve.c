@@ -5,11 +5,14 @@
 #include <pthread.h>
 #include <math.h>
 #include <cuda_runtime.h>
+#include <cusparse.h>
+
 
 
 bool is_prime(int n); 
 long long mod_exp(long long base, long long exp, long long mod); // Declare mod_exp
-void perform_sieving(long long* factor_base, int count, long long n, int*** matrix, int* num_smooth_numbers);
+void perform_sieving(long long* factor_base, int count, long long n, int** csrRowPtr, int* rowPtrSize, int** csrColInd, int* colIndSize);
+void printCSRContents(int* csrRowPtr, int rowPtrSize, int* csrColInd, int colIndSize);
 long long* generate_factor_base(long long n, int* count);
 
 void factor_primes(long long n) {
@@ -40,24 +43,37 @@ void gpuAssert(cudaError_t code, const char *file, int line, bool abort) {
    }
 }
 
-void copyMatrixToGPU(int** hostMatrix, int num_rows, int num_cols, int** deviceFlatMatrix) {
-    int totalSize = num_rows * num_cols * sizeof(int);
-    
-    // Allocate flat array on GPU
-    int* d_flatMatrix;
-    gpuErrchk(cudaMalloc((void**)&d_flatMatrix, totalSize));
+void setupAndSolveBinaryMatrix(int* h_csrRowPtr, int* h_csrColInd, int numRows, int nnz, float* h_b, float* h_x) {
+    cusparseHandle_t cusparseHandle;
+    cusparseCreate(&cusparseHandle);
 
-    // Copy row by row
-    for (int i = 0; i < num_rows; ++i) {
-        gpuErrchk(cudaMemcpy(d_flatMatrix + i * num_cols, hostMatrix[i], num_cols * sizeof(int), cudaMemcpyHostToDevice));
-    }
+    // Allocate memory on the device
+    int *d_csrRowPtr, *d_csrColInd;
+    float *d_b, *d_x;
+    cudaMalloc((void**)&d_csrRowPtr, (numRows + 1) * sizeof(int));
+    cudaMalloc((void**)&d_csrColInd, nnz * sizeof(int));
+    cudaMalloc((void**)&d_b, numRows * sizeof(float));
+    cudaMalloc((void**)&d_x, numRows * sizeof(float));
 
-    // Copy device pointer back
-    *deviceFlatMatrix = d_flatMatrix;
+    // Copy data to the device
+    cudaMemcpy(d_csrRowPtr, h_csrRowPtr, (numRows + 1) * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_csrColInd, h_csrColInd, nnz * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, h_b, numRows * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Assuming the solve operation here; specifics depend on your solver approach
+    // For example, using cuSPARSE operations to perform the matrix-vector multiplication
+    // and your own iterative solver since cuSPARSE doesn't directly solve Ax = b for binary matrices
+
+    // Copy the solution back to host
+    cudaMemcpy(h_x, d_x, numRows * sizeof(float), cudaMemcpyDeviceToHost);
+
+    // Cleanup
+    cudaFree(d_csrRowPtr);
+    cudaFree(d_csrColInd);
+    cudaFree(d_b);
+    cudaFree(d_x);
+    cusparseDestroy(cusparseHandle);
 }
-
-
-
 // very inefficient will change soon to eristo something prime generation
 bool is_prime(int n) {
     if (n <= 1) return false;
@@ -68,6 +84,9 @@ bool is_prime(int n) {
     }
     return true;
 }
+
+
+
 
 long long* generate_factor_base(long long n, int* count) {
     int size = (int)exp(sqrt(log(n) * log(log(n))));   // a common heuristic for how many prime numbers to check
@@ -107,30 +126,23 @@ long long* generate_factor_base(long long n, int* count) {
 }
 
 
-void perform_sieving(long long* factor_base, int count, long long n, int*** matrix, int* num_smooth_numbers) {
-    *num_smooth_numbers = 0;
-    int capacity = n / 100 + 1; // Adjusted initial capacity, ensure it's non-zero
-
-    // Allocate initial space for the matrix
-    *matrix = (int**)malloc(capacity * sizeof(int*));
-    if (*matrix == NULL) {
-        perror("Failed to allocate memory for matrix");
-        exit(EXIT_FAILURE);
-    }
+void perform_sieving(long long* factor_base, int count, long long n, int** csrRowPtr, int* csrRowPtrSize, int** csrColInd, int* csrColIndSize) {
+    int num_smooth_numbers = 0;
+    *csrRowPtrSize = 1; // Starting with one element
+    *csrColIndSize = 0; // Starting with no elements
+    *csrRowPtr = (int*)malloc(*csrRowPtrSize * sizeof(int));
+    *csrColInd = NULL; // Will be allocated as needed
+    (*csrRowPtr)[0] = 0; // Initial value indicating the start of the first row
 
     // Initialize thread-local storage for all threads
     int max_threads = omp_get_max_threads();
-    int*** temp_results = (int***)malloc(max_threads * sizeof(int**)); // Array of pointers to int* arrays
-    int* lengths = (int*)calloc(max_threads, sizeof(int)); // Store length of each thread's results
-    int* capacities = (int*)malloc(max_threads * sizeof(int)); // Store capacity of each thread's storage
+    int** temp_results = (int**)malloc(max_threads * sizeof(int*));
+    int* temp_results_sizes = (int*)calloc(max_threads, sizeof(int));
+    int* temp_results_capacities = (int*)malloc(max_threads * sizeof(int));
 
     for (int i = 0; i < max_threads; ++i) {
-        capacities[i] = capacity / max_threads + 1; // Initial capacity per thread
-        temp_results[i] = (int**)malloc(capacities[i] * sizeof(int*));
-        if (temp_results[i] == NULL) {
-            perror("Failed to allocate memory for temp_results");
-            exit(EXIT_FAILURE);
-        }
+        temp_results_capacities[i] = 10; // Arbitrary initial capacity
+        temp_results[i] = (int*)malloc(temp_results_capacities[i] * sizeof(int));
     }
 
     #pragma omp parallel
@@ -138,57 +150,47 @@ void perform_sieving(long long* factor_base, int count, long long n, int*** matr
         int id = omp_get_thread_num();
         #pragma omp for nowait
         for (long long i = 2; i <= n; ++i) {
+            int* exponent_vector = (int*)calloc(count, sizeof(int)); // Temporarily store indices
+            int exponent_vector_size = 0;
             long long num = i;
-            int* exponent_vector = (int*)calloc(count, sizeof(int)); // Initialize to 0s
             for (int j = 0; j < count && num > 1; ++j) {
                 while (num % factor_base[j] == 0) {
-                    exponent_vector[j] = (exponent_vector[j] + 1) % 2; // Calculate exponent modulo 2
+                    // Instead of pushing back, we manually manage the size and capacity
+                    if (exponent_vector_size == temp_results_capacities[id]) {
+                        temp_results_capacities[id] *= 2;
+                        temp_results[id] = (int*)realloc(temp_results[id], temp_results_capacities[id] * sizeof(int));
+                    }
+                    temp_results[id][exponent_vector_size++] = j; // Store index
                     num /= factor_base[j];
                 }
             }
             if (num == 1) { // num is smooth
-                if (lengths[id] == capacities[id]) { // Check if the current thread's storage needs expansion
-                    capacities[id] *= 2;
-                    temp_results[id] = realloc(temp_results[id], capacities[id] * sizeof(int*));
-                    if (temp_results[id] == NULL) {
-                        perror("Failed to resize temp_results");
-                        exit(EXIT_FAILURE);
+                #pragma omp critical
+                {
+                    for (int k = 0; k < exponent_vector_size; ++k) {
+                        if (*csrColIndSize == *csrRowPtrSize - 1) {
+                            // Need to expand csrRowPtr and csrColInd
+                            *csrRowPtrSize += 1;
+                            *csrRowPtr = (int*)realloc(*csrRowPtr, *csrRowPtrSize * sizeof(int));
+                            *csrColInd = (int*)realloc(*csrColInd, (*csrColIndSize + exponent_vector_size) * sizeof(int));
+                        }
+                        (*csrColInd)[(*csrColIndSize)++] = temp_results[id][k];
                     }
+                    (*csrRowPtr)[*csrRowPtrSize - 1] = *csrColIndSize;
+                    num_smooth_numbers++;
                 }
-                temp_results[id][lengths[id]++] = exponent_vector;
-            } else {
-                free(exponent_vector);
             }
+            free(exponent_vector);
         }
     }
 
-    // Merge results after parallel section
+    // Clean up
     for (int i = 0; i < max_threads; ++i) {
-        for (int j = 0; j < lengths[i]; ++j) {
-            if (*num_smooth_numbers == capacity) {
-                capacity *= 2; // Resize global matrix if needed
-                *matrix = realloc(*matrix, capacity * sizeof(int*));
-                if (*matrix == NULL) {
-                    perror("Failed to resize matrix");
-                    exit(EXIT_FAILURE);
-                }
-            }
-            (*matrix)[(*num_smooth_numbers)++] = temp_results[i][j];
-        }
-        free(temp_results[i]); // Free each thread's temporary storage
+        free(temp_results[i]);
     }
-    free(temp_results); // Free the array of pointers
-    free(lengths);
-    free(capacities);
-
-    // Optionally, resize the matrix to match the exact number of smooth numbers found
-    if (*num_smooth_numbers < capacity) {
-        *matrix = realloc(*matrix, (*num_smooth_numbers) * sizeof(int*));
-        if (*matrix == NULL && *num_smooth_numbers > 0) {
-            perror("Failed to shrink memory for matrix");
-            // Not exiting here because it's a shrink operation; data is still intact
-        }
-    }
+    free(temp_results);
+    free(temp_results_sizes);
+    free(temp_results_capacities);
 }
 
 long long mod_exp(long long base, long long exp, long long mod) {
@@ -214,7 +216,19 @@ int* flattenMatrix(int** matrix, int rows, int cols) {
     return flatMatrix;
 }
 
+void printCSRContents(int* csrRowPtr, int rowPtrSize, int* csrColInd, int colIndSize) {
+    printf("csrRowPtr:\n");
+    for (int i = 0; i < rowPtrSize; i++) {
+        printf("%d ", csrRowPtr[i]);
+    }
+    printf("\n");
 
+    printf("csrColInd:\n");
+    for (int i = 0; i < colIndSize; i++) {
+        printf("%d ", csrColInd[i]);
+    }
+    printf("\n");
+}
 
 
 void print_matrix(int** matrix, int num_smooth_numbers, int count) {
@@ -231,13 +245,18 @@ int main() {
     long long n = 15; // The number to factor
     int count;
     long long* factor_base = generate_factor_base(n, &count);
-    int** matrix = NULL;
+    int* csrRowPtr = NULL;
+    int rowPtrSize = 0;
+    int* csrColInd = NULL;
+    int colIndSize = 0;
+
     int num_smooth_numbers = 0;
 
-    perform_sieving(factor_base, count, n, &matrix, &num_smooth_numbers);
+    perform_sieving(factor_base, count, n, &csrRowPtr, &csrColInd);
+    printCSRContents(csrRowPtr,csrColInd)
 
     int* deviceFlatMatrix;
-    copyMatrixToGPU(matrix,num_smooth_numbers,count,&deviceFlatMatrix);
+    //copyMatrixToGPU(matrix,num_smooth_numbers,count,&deviceFlatMatrix);
     //print_matrix(matrix, num_smooth_numbers, count);
 
     
