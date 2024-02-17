@@ -247,8 +247,18 @@ int main() {
     int** csrColInd; // Pointer to CSR column indices array on the host
     fprintf(stdout, "Number of non-zero elements: %d\n", nnz);
     int* d_csrRowPtr; 
-    int* d_csrColInd; 
-
+    int* d_csrColInd;
+    printf("Number of smooth numbers: %d\n", num_smooth_numbers);
+    printf("Value of count: %d\n", count); 
+    cudaMalloc((void **)&d_csrRowPtr, sizeof(int*));
+    cudaMalloc((void **)&d_csrColInd, sizeof(int*));
+    cudaError_t transferStatus = transferMatrixToDevice(csrRowPtr, csrColInd, num_smooth_numbers, count, nnz, d_csrRowPtr, d_csrColInd);
+    if (transferStatus != cudaSuccess) {
+        printf("Error transferring matrix to device: %s\n", cudaGetErrorString(transferStatus));
+        // Handle error
+    } else {
+        printf("fuck yeah");
+    }
     print_matrix(matrix, num_smooth_numbers, count);
 
     
