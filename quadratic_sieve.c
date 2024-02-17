@@ -243,25 +243,23 @@ int main() {
     int nnz;
 
     perform_sieving(factor_base, count, n, &matrix, &num_smooth_numbers, &nnz);
-    int** csrRowPtr; // Pointer to CSR row pointers array on the host
-    int** csrColInd; // Pointer to CSR column indices array on the host
+    int* csrRowPtr; // Pointer to CSR row pointers array on the host
+    int* csrColInd; // Pointer to CSR column indices array on the host
     fprintf(stdout, "Number of non-zero elements: %d\n", nnz);
     int* d_csrRowPtr; 
     int* d_csrColInd;
     printf("Number of smooth numbers: %d\n", num_smooth_numbers);
     printf("Value of count: %d\n", count); 
-    cudaMalloc((void **)&d_csrRowPtr, sizeof(int*));
-    cudaMalloc((void **)&d_csrColInd, sizeof(int*));
-    cudaError_t transferStatus = transferMatrixToDevice(csrRowPtr, csrColInd, num_smooth_numbers, count, nnz, d_csrRowPtr, d_csrColInd);
+    cudaMalloc((void **)&d_csrRowPtr, sizeof(int) * (num_smooth_numbers + 1)); // Allocate space for CSR row pointers on device
+    cudaMalloc((void **)&d_csrColInd, sizeof(int) * nnz); // Allocate space for CSR column indices on device
+
+    cudaError_t transferStatus = transferMatrixToDevice(matrix, num_smooth_numbers, count, nnz, &d_csrRowPtr, &d_csrColInd);
     if (transferStatus != cudaSuccess) {
         printf("Error transferring matrix to device: %s\n", cudaGetErrorString(transferStatus));
         // Handle error
     } else {
-        printf("fuck yeah");
+        printf("Matrix transferred to device successfully!\n");
     }
-    print_matrix(matrix, num_smooth_numbers, count);
-
-    
 
     for (int i = 0; i < num_smooth_numbers; ++i) {
         free(matrix[i]); 
