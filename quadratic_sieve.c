@@ -216,7 +216,18 @@ cudaError_t transferMatrixToCSRAndToDevice(int** denseMatrix, int numRows, int n
         csrRowPtr[i + 1] = count;
     }
 
+    printf("CSR Row Pointers:\n");
+for (int i = 0; i <= numRows; ++i) {
+    printf("%d ", csrRowPtr[i]);
+}
+printf("\n");
 
+// Print CSR Column Indices
+printf("CSR Column Indices:\n");
+for (int i = 0; i < nnz; ++i) {
+    printf("%d ", csrColInd[i]);
+}
+printf("\n");
     cudaError_t status;
     status = cudaMalloc((void**)d_csrRowPtr, (numRows + 1) * sizeof(int));
     if (status != cudaSuccess) {
