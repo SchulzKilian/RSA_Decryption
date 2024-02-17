@@ -245,16 +245,12 @@ cudaError_t transferMatrixToCSRAndToDevice(int** denseMatrix, int numRows, int n
         goto Error;
     }
 
-    status = cudaMemcpy(*d_csrValues, csrValues, nnz * sizeof(float), cudaMemcpyHostToDevice);
-    if (status != cudaSuccess) {
-        fprintf(stderr, "Failed to copy CSR values to device\n");
-        goto Error;
-    }
+
 
     // Free host memory
     free(csrRowPtr);
     free(csrColInd);
-    free(csrValues);
+
 
     return cudaSuccess;
 
