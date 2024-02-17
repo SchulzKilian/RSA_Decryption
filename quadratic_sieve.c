@@ -4,12 +4,12 @@
 #include <stdbool.h>
 #include <pthread.h>
 #include <math.h>
-#include <cuda_runtime.h>
+
 
 
 bool is_prime(int n); 
 long long mod_exp(long long base, long long exp, long long mod); // Declare mod_exp
-void perform_sieving(long long* factor_base, int count, long long n, int*** matrix, int* num_smooth_numbers);
+void perform_sieving(long long* factor_base, int count, long long n, int** csrRowPtr, int** csrColInd, int* num_non_zero);
 long long* generate_factor_base(long long n, int* count);
 
 void factor_primes(long long n) {
@@ -19,7 +19,7 @@ void factor_primes(long long n) {
     int num_smooth_numbers = 0;
     
     // Step 2: sieeeve
-    perform_sieving(factor_base, count, n, &matrix, &num_smooth_numbers);
+    //perform_sieving(factor_base, count, n, &matrix, &num_smooth_numbers);
     
     // Step 3: and then finish it off
     //solve_linear_algebra(relations, num_relations, count);
@@ -84,89 +84,34 @@ long long* generate_factor_base(long long n, int* count) {
 }
 
 
-void perform_sieving(long long* factor_base, int count, long long n, int*** matrix, int* num_smooth_numbers) {
-    *num_smooth_numbers = 0;
-    int capacity = n / 100 + 1; // Adjusted initial capacity, ensure it's non-zero
+void perform_sieving(long long* factor_base, int count, long long n, int** csrRowPtr, int** csrColInd, int* num_non_zero) {
+    *num_non_zero = 0;
+    *csrRowPtr = (int*)malloc((n + 1) * sizeof(int)); // Allocate memory for CSR row pointer
+    *csrColInd = (int*)malloc(n * sizeof(int)); // Allocate memory for CSR column indices
 
-    // Allocate initial space for the matrix
-    *matrix = (int**)malloc(capacity * sizeof(int*));
-    if (*matrix == NULL) {
-        perror("Failed to allocate memory for matrix");
-        exit(EXIT_FAILURE);
-    }
+    // Initialize CSR row pointer
+    (*csrRowPtr)[0] = 0;
 
-    // Initialize thread-local storage for all threads
-    int max_threads = omp_get_max_threads();
-    int*** temp_results = (int***)malloc(max_threads * sizeof(int**)); // Array of pointers to int* arrays
-    int* lengths = (int*)calloc(max_threads, sizeof(int)); // Store length of each thread's results
-    int* capacities = (int*)malloc(max_threads * sizeof(int)); // Store capacity of each thread's storage
-
-    for (int i = 0; i < max_threads; ++i) {
-        capacities[i] = capacity / max_threads + 1; // Initial capacity per thread
-        temp_results[i] = (int**)malloc(capacities[i] * sizeof(int*));
-        if (temp_results[i] == NULL) {
-            perror("Failed to allocate memory for temp_results");
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    #pragma omp parallel
-    {
-        int id = omp_get_thread_num();
-        #pragma omp for nowait
-        for (long long i = 2; i <= n; ++i) {
-            long long num = i;
-            int* exponent_vector = (int*)calloc(count, sizeof(int)); // Initialize to 0s
-            for (int j = 0; j < count && num > 1; ++j) {
-                while (num % factor_base[j] == 0) {
-                    exponent_vector[j] = (exponent_vector[j] + 1) % 2; // Calculate exponent modulo 2
-                    num /= factor_base[j];
-                }
-            }
-            if (num == 1) { // num is smooth
-                if (lengths[id] == capacities[id]) { // Check if the current thread's storage needs expansion
-                    capacities[id] *= 2;
-                    temp_results[id] = realloc(temp_results[id], capacities[id] * sizeof(int*));
-                    if (temp_results[id] == NULL) {
-                        perror("Failed to resize temp_results");
-                        exit(EXIT_FAILURE);
-                    }
-                }
-                temp_results[id][lengths[id]++] = exponent_vector;
-            } else {
-                free(exponent_vector);
+    for (long long i = 2; i <= n; ++i) {
+        long long num = i;
+        int num_factors = 0;
+        for (int j = 0; j < count && num > 1; ++j) {
+            while (num % factor_base[j] == 0) {
+                num_factors++;
+                num /= factor_base[j];
             }
         }
-    }
-
-    // Merge results after parallel section
-    for (int i = 0; i < max_threads; ++i) {
-        for (int j = 0; j < lengths[i]; ++j) {
-            if (*num_smooth_numbers == capacity) {
-                capacity *= 2; // Resize global matrix if needed
-                *matrix = realloc(*matrix, capacity * sizeof(int*));
-                if (*matrix == NULL) {
-                    perror("Failed to resize matrix");
-                    exit(EXIT_FAILURE);
-                }
+        if (num == 1) { // num is smooth
+            for (int j = 0; j < num_factors; ++j) {
+                (*csrColInd)[*num_non_zero] = j;
+                (*num_non_zero)++;
             }
-            (*matrix)[(*num_smooth_numbers)++] = temp_results[i][j];
         }
-        free(temp_results[i]); // Free each thread's temporary storage
-    }
-    free(temp_results); // Free the array of pointers
-    free(lengths);
-    free(capacities);
-
-    // Optionally, resize the matrix to match the exact number of smooth numbers found
-    if (*num_smooth_numbers < capacity) {
-        *matrix = realloc(*matrix, (*num_smooth_numbers) * sizeof(int*));
-        if (*matrix == NULL && *num_smooth_numbers > 0) {
-            perror("Failed to shrink memory for matrix");
-            // Not exiting here because it's a shrink operation; data is still intact
-        }
+        (*csrRowPtr)[i] = *num_non_zero; // Update CSR row pointer
     }
 }
+
+
 
 long long mod_exp(long long base, long long exp, long long mod) {
     long long result = 1;
@@ -195,48 +140,7 @@ int countNonZeros(int** hostMatrix, int numRows, int numCols) {
     return count;
 }
 
-// Modified function to transfer matrix in CSR format
-cudaError_t transferMatrixToCSRDevice(int** hostMatrix, int numRows, int numCols, int** d_csrRowPtr, int** d_csrColInd, float** d_csrVal) {
-    int nnz = countNonZeros(hostMatrix, numRows, numCols); // Number of non-zero elements
-    int* csrRowPtr = (int*)malloc((numRows + 1) * sizeof(int));
-    int* csrColInd = (int*)malloc(nnz * sizeof(int));
-    float* csrVal = (float*)malloc(nnz * sizeof(float)); // Assuming all values are 1.0
 
-    // Convert to CSR format
-    int pos = 0;
-    csrRowPtr[0] = 0;
-    for (int i = 0; i < numRows; ++i) {
-        for (int j = 0; j < numCols; ++j) {
-            if (hostMatrix[i][j] != 0) {
-                csrColInd[pos] = j;
-                csrVal[pos] = 1.0f; // Fill with 1.0 for all non-zeros
-                pos++;
-            }
-        }
-        csrRowPtr[i + 1] = pos;
-    }
-
-    // Allocate memory on the device for CSR components
-    cudaError_t status;
-    status = cudaMalloc((void**)d_csrRowPtr, (numRows + 1) * sizeof(int));
-    if (status != cudaSuccess) return status;
-    status = cudaMalloc((void**)d_csrColInd, nnz * sizeof(int));
-    if (status != cudaSuccess) return status;
-    status = cudaMalloc((void**)d_csrVal, nnz * sizeof(float));
-    if (status != cudaSuccess) return status;
-
-    // Copy CSR components from host to device
-    status = cudaMemcpy(*d_csrRowPtr, csrRowPtr, (numRows + 1) * sizeof(int), cudaMemcpyHostToDevice);
-    if (status != cudaSuccess) goto cleanup;
-    status = cudaMemcpy(*d_csrColInd, csrColInd, nnz * sizeof(int), cudaMemcpyHostToDevice);
-    if (status != cudaSuccess) goto cleanup;
-    status = cudaMemcpy(*d_csrVal, csrVal, nnz * sizeof(float), cudaMemcpyHostToDevice);
-
-    free(csrRowPtr);
-    free(csrColInd);
-    free(csrVal);
-    return status;
-}
 
 void print_matrix(int** matrix, int num_smooth_numbers, int count) {
     printf("Matrix of Exponent Vectors Modulo 2:\n");
@@ -252,31 +156,26 @@ int main() {
     long long n = 15; // The number to factor
     int count;
     long long* factor_base = generate_factor_base(n, &count);
-    int** matrix = NULL;
-    int num_smooth_numbers = 0;
-
-    perform_sieving(factor_base, count, n, &matrix, &num_smooth_numbers);
-
-
-    print_matrix(matrix, num_smooth_numbers, count);
-    int* d_csrRowPtr = NULL;
-    int* d_csrColInd = NULL;
-    float* d_csrVal = NULL;
-
-    cudaError_t status = transferMatrixToCSRDevice(matrix, num_smooth_numbers, count, &d_csrRowPtr, &d_csrColInd, &d_csrVal);
-    if (status == cudaSuccess) {
-        fprintf(stdout, "Success\n");
-    } else {
-        fprintf(stderr, "CUDA error: %s\n", cudaGetErrorString(status));
+        int* csrRowPtr;
+    int* csrColInd;
+    int num_non_zero;
+    // Call the perform_sieving function
+    perform_sieving(factor_base, count, n, &csrRowPtr, &csrColInd, &num_non_zero);
+    // Print CSR arrays for verification
+    printf("CSR Row Pointer:\n");
+    for (int i = 0; i <= n; ++i) {
+        printf("%d ", csrRowPtr[i]);
     }
-
-    for (int i = 0; i < num_smooth_numbers; ++i) {
-        free(matrix[i]); 
+    printf("\n\n");
+    printf("CSR Column Indices:\n");
+    for (int i = 0; i < num_non_zero; ++i) {
+        printf("%d ", csrColInd[i]);
     }
-    free(matrix); 
-    cudaFree(d_csrRowPtr);
-    cudaFree(d_csrColInd);
-    cudaFree(d_csrVal);
+    printf("\n");
+
+    // Free allocated memory
+    free(csrRowPtr);
+    free(csrColInd);
     free(factor_base);
     return 0;
 }
