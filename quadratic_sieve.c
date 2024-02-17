@@ -212,7 +212,6 @@ cudaError_t transferMatrixToDevice(int* csrRowPtr, int* csrColInd, int numRows, 
         printf("%d ", csrRowPtr[i]);
 }
     printf("\n");
-    fprintf(stderr, "d_csrowptr: %d\n", *d_csrRowPtr);
     status = cudaMemcpy(*d_csrRowPtr, csrRowPtr, (numRows + 1) * sizeof(int), cudaMemcpyHostToDevice);
     if (status != cudaSuccess) {
         cudaFree(*d_csrRowPtr);
