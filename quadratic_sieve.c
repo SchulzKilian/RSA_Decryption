@@ -11,7 +11,7 @@ bool is_prime(int n);
 long long mod_exp(long long base, long long exp, long long mod); // Declare mod_exp
 void perform_sieving(long long* factor_base, int count, long long n, int*** matrix, int* num_smooth_numbers, int* nnz);
 long long* generate_factor_base(long long n, int* count);
-
+cudaError_t transferMatrixToDevice(int* csrRowPtr, int* csrColInd, int numRows, int numCols, int nnz, int** d_csrRowPtr, int** d_csrColInd);
 void factor_primes(long long n) {
     int count;
     long long* factor_base = generate_factor_base(n, &count);
@@ -253,7 +253,7 @@ int main() {
     cudaMalloc((void **)&d_csrRowPtr, sizeof(int) * (num_smooth_numbers + 1)); // Allocate space for CSR row pointers on device
     cudaMalloc((void **)&d_csrColInd, sizeof(int) * nnz); // Allocate space for CSR column indices on device
 
-    cudaError_t transferStatus = transferMatrixToDevice(matrix, num_smooth_numbers, count, nnz, &d_csrRowPtr, &d_csrColInd);
+    cudaError_t transferStatus = transferMatrixToDevice(csrRowPtr, csrColInd, num_smooth_numbers, count, nnz, &d_csrRowPtr, &d_csrColInd);
     if (transferStatus != cudaSuccess) {
         printf("Error transferring matrix to device: %s\n", cudaGetErrorString(transferStatus));
         // Handle error
