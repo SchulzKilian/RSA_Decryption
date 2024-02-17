@@ -189,7 +189,7 @@ long long mod_exp(long long base, long long exp, long long mod) {
 }
 
 
-ccudaError_t transferMatrixToCSRAndToDevice(int** denseMatrix, int numRows, int numCols, int** d_csrRowPtr, int** d_csrColInd, , int nnz) {
+cudaError_t transferMatrixToCSRAndToDevice(int** denseMatrix, int numRows, int numCols, int** d_csrRowPtr, int** d_csrColInd,  int nnz) {
 
 
     // Allocate host memory for CSR format
@@ -299,7 +299,7 @@ int main() {
     int* d_csrColInd = NULL;
     printf("Number of smooth numbers: %d\n", num_smooth_numbers);
     printf("Value of count: %d\n", count); 
-    cudaError_t transferStatus = transferMatrixToDevice(matrix, num_smooth_numbers, count, &d_csrRowPtr, &d_csrColInd, nnz);
+    cudaError_t transferStatus = transferMatrixToCSRAndToDevice(matrix, num_smooth_numbers, count, &d_csrRowPtr, &d_csrColInd, nnz);
     if (transferStatus != cudaSuccess) {
         printf("Error transferring matrix to device: %s\n", cudaGetErrorString(transferStatus));
         // Handle error
