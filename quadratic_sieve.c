@@ -257,10 +257,8 @@ cudaError_t transferMatrixToCSRAndToDevice(int** denseMatrix, int numRows, int n
 Error:
     cudaFree(*d_csrRowPtr);
     cudaFree(*d_csrColInd);
-    cudaFree(*d_csrValues);
     free(csrRowPtr);
     free(csrColInd);
-    free(csrValues);
     return status;
 }
 
