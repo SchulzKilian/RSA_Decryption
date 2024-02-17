@@ -11,7 +11,8 @@ bool is_prime(int n);
 long long mod_exp(long long base, long long exp, long long mod); // Declare mod_exp
 void perform_sieving(long long* factor_base, int count, long long n, int*** matrix, int* num_smooth_numbers, int* nnz);
 long long* generate_factor_base(long long n, int* count);
-cudaError_t transferMatrixToDevice(int* csrRowPtr, int* csrColInd, int numRows, int numCols, int nnz, int** d_csrRowPtr, int** d_csrColInd);
+cudaError_t transferDenseMatrixToCSRAndToDevice(int** matrix, int numRows, int numCols, int** d_csrRowPtr, int** d_csrColInd, int* nnz);
+
 void factor_primes(long long n) {
     int count;
     long long* factor_base = generate_factor_base(n, &count);
@@ -188,48 +189,92 @@ long long mod_exp(long long base, long long exp, long long mod) {
 }
 
 
-cudaError_t transferMatrixToDevice(int* csrRowPtr, int* csrColInd, int numRows, int numCols, int nnz, int** d_csrRowPtr, int** d_csrColInd) {
+ccudaError_t transferMatrixToCSRAndToDevice(int** denseMatrix, int numRows, int numCols, int** d_csrRowPtr, int** d_csrColInd, , int nnz) {
+
+
+    // Allocate host memory for CSR format
+    int* csrRowPtr = (int*)malloc((numRows + 1) * sizeof(int));
+    int* csrColInd = (int*)malloc(nnz * sizeof(int));
+    float* csrValues = (float*)malloc(nnz * sizeof(float)); // Assuming values are float, change if different
+
+    if (!csrRowPtr || !csrColInd || !csrValues) {
+        // Handle memory allocation failure
+        fprintf(stderr, "Failed to allocate host memory for CSR arrays\n");
+        return cudaErrorMemoryAllocation; // Use appropriate CUDA error
+    }
+
+    // Fill CSR arrays
+    int count = 0;
+    csrRowPtr[0] = 0;
+    for (int i = 0; i < numRows; ++i) {
+        for (int j = 0; j < numCols; ++j) {
+            if (denseMatrix[i][j] != 0) {
+                csrColInd[count] = j;
+                csrValues[count] = 1
+                count++;
+            }
+        }
+        csrRowPtr[i + 1] = count;
+    }
+
+
     cudaError_t status;
-
-    // Allocate memory for CSR row pointers on the device
-    status = cudaMalloc((void **)d_csrRowPtr, (numRows + 1) * sizeof(int));
+    status = cudaMalloc((void**)d_csrRowPtr, (numRows + 1) * sizeof(int));
     if (status != cudaSuccess) {
-        fprintf(stderr, "allocate csr row failed: %s\n", cudaGetErrorString(status));
+        fprintf(stderr, "Failed to allocate device memory for CSR row pointers\n");
         return status;
     }
 
-    // Allocate memory for CSR column indices on the device
-    status = cudaMalloc((void **)d_csrColInd, nnz * sizeof(int));
+    status = cudaMalloc((void**)d_csrColInd, nnz * sizeof(int));
     if (status != cudaSuccess) {
-        cudaFree(*d_csrRowPtr);  // Free memory for CSR row pointers if allocation for CSR column indices fails
-        fprintf(stderr, "allocate csr column failed: %s\n", cudaGetErrorString(status));
+        cudaFree(*d_csrRowPtr);
+        fprintf(stderr, "Failed to allocate device memory for CSR column indices\n");
         return status;
     }
 
+    status = cudaMalloc((void**)d_csrValues, nnz * sizeof(float));
+    if (status != cudaSuccess) {
+        cudaFree(*d_csrRowPtr);
+        cudaFree(*d_csrColInd);
+        fprintf(stderr, "Failed to allocate device memory for CSR values\n");
+        return status;
+    }
 
+    // Copy CSR data from host to device
     status = cudaMemcpy(*d_csrRowPtr, csrRowPtr, (numRows + 1) * sizeof(int), cudaMemcpyHostToDevice);
     if (status != cudaSuccess) {
-if (*d_csrRowPtr == NULL || csrRowPtr == NULL) {
-    fprintf(stderr, "One of the pointers is NULL.\n");
-}
-        fprintf(stderr, "copy csr row failed: %s\n", cudaGetErrorString(status));
-        cudaFree(*d_csrRowPtr);
-        cudaFree(*d_csrColInd);
-        return status;
+        fprintf(stderr, "Failed to copy CSR row pointers to device\n");
+        goto Error;
     }
 
-    // Copy CSR column indices from host to device
     status = cudaMemcpy(*d_csrColInd, csrColInd, nnz * sizeof(int), cudaMemcpyHostToDevice);
     if (status != cudaSuccess) {
-        cudaFree(*d_csrRowPtr);
-        cudaFree(*d_csrColInd);
-        fprintf(stderr, "copy csr column indices failed: %s\n", cudaGetErrorString(status));
-        return status;
+        fprintf(stderr, "Failed to copy CSR column indices to device\n");
+        goto Error;
     }
 
-    return cudaSuccess; 
-}
+    status = cudaMemcpy(*d_csrValues, csrValues, nnz * sizeof(float), cudaMemcpyHostToDevice);
+    if (status != cudaSuccess) {
+        fprintf(stderr, "Failed to copy CSR values to device\n");
+        goto Error;
+    }
 
+    // Free host memory
+    free(csrRowPtr);
+    free(csrColInd);
+    free(csrValues);
+
+    return cudaSuccess;
+
+Error:
+    cudaFree(*d_csrRowPtr);
+    cudaFree(*d_csrColInd);
+    cudaFree(*d_csrValues);
+    free(csrRowPtr);
+    free(csrColInd);
+    free(csrValues);
+    return status;
+}
 
 void print_matrix(int** matrix, int num_smooth_numbers, int count) {
     printf("Matrix of Exponent Vectors Modulo 2:\n");
@@ -250,14 +295,11 @@ int main() {
     int nnz;
 
     perform_sieving(factor_base, count, n, &matrix, &num_smooth_numbers, &nnz);
-    int* csrRowPtr = NULL; // Pointer to CSR row pointers array on the host
-    int* csrColInd = NULL; // Pointer to CSR column indices array on the host
-    fprintf(stdout, "Number of non-zero elements: %d\n", nnz);
-    int* d_csrRowPtr; 
-    int* d_csrColInd;
+    int* d_csrRowPtr = NULL;
+    int* d_csrColInd = NULL;
     printf("Number of smooth numbers: %d\n", num_smooth_numbers);
     printf("Value of count: %d\n", count); 
-    cudaError_t transferStatus = transferMatrixToDevice(csrRowPtr, csrColInd, num_smooth_numbers, count, nnz, &d_csrRowPtr, &d_csrColInd);
+    cudaError_t transferStatus = transferMatrixToDevice(matrix, num_smooth_numbers, count, &d_csrRowPtr, &d_csrColInd, nnz);
     if (transferStatus != cudaSuccess) {
         printf("Error transferring matrix to device: %s\n", cudaGetErrorString(transferStatus));
         // Handle error
