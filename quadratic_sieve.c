@@ -5,6 +5,9 @@
 #include <pthread.h>
 #include <math.h>
 #include <cuda_runtime.h>
+#include <cusolverSp.h>
+#include <cuda_runtime_api.h>
+#include <cusparse_v2.h>
 
 
 bool is_prime(int n); 
@@ -290,7 +293,7 @@ int main() {
     int** matrix = NULL;
     int num_smooth_numbers = 0;
     int nnz;
-
+    
     perform_sieving(factor_base, count, n, &matrix, &num_smooth_numbers, &nnz);
     int* d_csrRowPtr = NULL;
     int* d_csrColInd = NULL;
@@ -302,6 +305,63 @@ int main() {
         // Handle error
     } else {
         printf("Matrix transferred to device successfully!\n");
+        float *d_b, *d_x; // Using float, but adjust type according to your problem
+        cudaMalloc((void **)&d_b, n * sizeof(float));
+        cudaMalloc((void **)&d_x, n * sizeof(float));
+
+        // Initialize b with your values. Here we just set it to 1 for simplicity.
+        // In practice, you'd copy your actual 'b' values to d_b
+        float *h_b = (float *)malloc(n * sizeof(float));
+        for(int i = 0; i < n; ++i) {
+            h_b[i] = 1.0f; // Example initialization
+        }
+        cudaMemcpy(d_b, h_b, n * sizeof(float), cudaMemcpyHostToDevice);
+
+        // Initialize cuSPARSE
+        cusparseHandle_t cusparseH = NULL;
+        cusparseCreate(&cusparseH);
+
+        // Create matrix descriptor for A
+        cusparseMatDescr_t descrA = NULL;
+        cusparseCreateMatDescr(&descrA);
+        cusparseSetMatType(descrA, CUSPARSE_MATRIX_TYPE_GENERAL);
+        cusparseSetMatIndexBase(descrA, CUSPARSE_INDEX_BASE_ZERO);
+
+        // Solve Ax = b using cuSPARSE
+        // Here you need to choose the appropriate solver. As an example, we'll use
+        // csrlsvqr (QR factorization) but in practice, you should select based on your matrix properties
+        int *d_P = NULL; // permutation array for QR factorization, not always required
+        void *buffer = NULL; // buffer for internal calculations
+        size_t bufferSize = 0;
+        cusparseScsrlsvqrBufferInfo(cusparseH, n, nnz, descrA, /*d_values*/, d_csrRowPtr, d_csrColInd,
+                                    d_b, 1e-12, 0, &bufferSize);
+
+        // Allocate buffer
+        cudaMalloc(&buffer, bufferSize);
+
+        cusparseScsrlsvqr(cusparseH, n, nnz, descrA, /*d_values*/, d_csrRowPtr, d_csrColInd,
+                        d_b, d_x, 1e-12, 0, &d_P, &buffer);
+
+        // Copy solution vector from device to host
+        float *h_x = (float *)malloc(n * sizeof(float));
+        cudaMemcpy(h_x, d_x, n * sizeof(float), cudaMemcpyDeviceToHost);
+        printf("Solution vector x:\n");
+        for(int i = 0; i < n; ++i) {
+        printf("%f\n", h_x[i]);
+        }
+        // Cleanup
+        free(h_b);
+        free(h_x);
+        cudaFree(d_b);
+        cudaFree(d_x);
+        cudaFree(d_P);
+        cudaFree(buffer);
+        cusparseDestroyMatDescr(descrA);
+        cusparseDestroy(cusparseH);
+
+    // Continue with the rest of your program...
+
+    return 0;
     }
 
     for (int i = 0; i < num_smooth_numbers; ++i) {
