@@ -324,68 +324,46 @@ int main() {
     float* d_x = NULL;
     float* d_b = NULL; // Assuming d_b is initialized somewhere
     float* h_x = (float*)malloc(n * sizeof(float)); // Solution vector
-    float alpha = 1.0f; // Assuming alpha is used for scaling
     cusparseSpSVDescr_t spsvDescr;
-    printf("Number of smooth numbers: %d\n", num_smooth_numbers);
-    printf("Value of count: %d\n", count);
+float alpha = 1.0f; // Assuming this is your scalar multiplier
 
-    // Assuming transferMatrixToCSRAndToDevice is correctly implemented
-    cudaError_t transferStatus = transferMatrixToCSRAndToDevice(matrix, num_smooth_numbers, count, &d_csrRowPtr, &d_csrColInd, nnz);
-    if (transferStatus != cudaSuccess) {
-        printf("Error transferring matrix to device: %s\n", cudaGetErrorString(transferStatus));
-        return 1; // Handle error
-    }
-    printf("Matrix transferred to device successfully!\n");
+// Step 1: Create the SpSV descriptor
+CHECK_CUSPARSE(cusparseSpSV_createDescr(&spsvDescr));
 
-    // Allocate memory for d_x and d_b if not already done
-    CHECK_CUDA(cudaMalloc((void**)&d_x, n * sizeof(float)));
-    CHECK_CUDA(cudaMalloc((void**)&d_b, n * sizeof(float)));
+// Step 2: Query the buffer size for the SpSV operation
+size_t bufferSize = 0;
+void* dBuffer = NULL;
+CHECK_CUSPARSE(cusparseSpSV_bufferSize(
+    cusparseH,
+    CUSPARSE_OPERATION_NON_TRANSPOSE,
+    &alpha,
+    matA,
+    vecB,
+    vecX,
+    CUDA_R_32F,
+    CUSPARSE_SPSV_ALG_DEFAULT,
+    spsvDescr,
+    &bufferSize
+));
 
-    // Initialize cusparse handle
-    cusparseHandle_t cusparseH = NULL;
-    CHECK_CUSPARSE(cusparseCreate(&cusparseH));
+// Allocate buffer for the operation
+CHECK_CUDA(cudaMalloc(&dBuffer, bufferSize));
 
-    // Create sparse matrix A in CSR format
-    cusparseSpMatDescr_t matA;
-    CHECK_CUSPARSE(cusparseCreateCsr(&matA, n, n, nnz, d_csrRowPtr, d_csrColInd, d_values,
-                                    CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I,
-                                    CUSPARSE_INDEX_BASE_ZERO, CUDA_R_32F));
+// Step 3: Perform the solve operation
+CHECK_CUSPARSE(cusparseSpSV_solve(
+    cusparseH,
+    CUSPARSE_OPERATION_NON_TRANSPOSE,
+    &alpha,
+    matA,
+    vecB,
+    vecX,
+    CUDA_R_32F,
+    CUSPARSE_SPSV_ALG_DEFAULT,
+    spsvDescr,
+    dBuffer
+));
 
-    // Create dense vector X
-    cusparseDnVecDescr_t vecX;
-    CHECK_CUSPARSE(cusparseCreateDnVec(&vecX, n, d_x, CUDA_R_32F));
 
-    // Create dense vector B
-    cusparseDnVecDescr_t vecB;
-    CHECK_CUSPARSE(cusparseCreateDnVec(&vecB, n, d_b, CUDA_R_32F));
-
-    // Assuming you have initialized d_b with your specific values
-    // For example, if d_b should be a vector of ones:
-    // CHECK_CUDA(cudaMemset(d_b, 1, n * sizeof(float)));
-    CHECK_CUSPARSE(cusparseSpSV_createDescr(&spsvDescr));
-    // Perform the solve operation
-    size_t bufferSize = 0;
-    void* dBuffer = NULL;
-    CHECK_CUSPARSE(cusparseSpSV_bufferSize(cusparseH, CUSPARSE_OPERATION_NON_TRANSPOSE, 
-                                           &alpha, matA, vecB, vecX, CUDA_R_32F, 
-                                           CUSPARSE_SPSV_ALG_DEFAULT, &bufferSize));
-
-    CHECK_CUDA(cudaMalloc(&dBuffer, bufferSize));
-
-    CHECK_CUSPARSE(cusparseSpSV_solve(cusparseH, CUSPARSE_OPERATION_NON_TRANSPOSE, 
-                                      &alpha, matA, vecB, vecX, CUDA_R_32F, 
-                                      CUSPARSE_SPSV_ALG_DEFAULT, dBuffer));
-
-    // Copy solution vector from device to host
-    CHECK_CUDA(cudaMemcpy(h_x, d_x, n * sizeof(float), cudaMemcpyDeviceToHost));
-
-    // Print solution
-    printf("Solution vector x:\n");
-    for (int i = 0; i < n; ++i) {
-        printf("%f\n", h_x[i]);
-    }
-
-    // Cleanup
     cusparseDestroySpMat(matA);
     cusparseDestroyDnVec(vecX);
     cusparseDestroyDnVec(vecB);
