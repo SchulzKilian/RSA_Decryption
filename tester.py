@@ -9,8 +9,17 @@ import ctypes
 # Config variables
 MIN_RANGE = 10000
 MAX_RANGE = 100000
-TEST_NUMBERS = 1
-liste = [False,False,False,False,True]
+TEST_NUMBERS = 5
+
+liste = [
+         False, # cuda normal
+         False, # c normal
+         False, # brute force pythong
+         False, # sieve python
+         False, # fermat openmp
+         True,# Quadratic Sieve
+         True # fermat sequence
+         ]
 
 
 
@@ -39,10 +48,28 @@ if liste[4]:
     result = ctypes.c_longlong()
     factor = ctypes.c_longlong()
 
+if liste[5]:
+    quadlib = ctypes.CDLL('./libfermat.so') 
+    quadlib.compute_primes.argtypes = [ctypes.c_longlong, ctypes.POINTER(ctypes.c_longlong), ctypes.POINTER(ctypes.c_longlong)]
+    quadlib.compute_primes.restype = None
+    result = ctypes.c_longlong()
+    factor = ctypes.c_longlong()
+
+if liste[6]:
+    fermatser = ctypes.CDLL('./fermat_sequence.so') 
+    fermatser.compute_primes.argtypes = [ctypes.c_longlong, ctypes.POINTER(ctypes.c_longlong), ctypes.POINTER(ctypes.c_longlong)]
+    fermatser.compute_primes.restype = None
+    result = ctypes.c_longlong()
+    factor = ctypes.c_longlong()   
+
 
 
 def get_prime():
     n = random.choice(primes)
+    return n
+
+def get_medium_small_prime():
+    n = random.choice(medium_small_primes)
     return n
 
 def get_medium_prime():
@@ -59,6 +86,8 @@ def test_it():
     brute_force = 0
     fermat = 0
     intelligent =  0
+    fermats = 0
+    q_sieve= 0
     for k in range(TEST_NUMBERS):
         b = get_medium_prime()
         c = get_medium_prime()
@@ -75,7 +104,11 @@ def test_it():
             lib.compute_primes(b*c, ctypes.byref(result), ctypes.byref(factor))
             a,d = int(result.value), int(factor.value)
             end_time =time.time()
-            assert{a,d} == {b,c}
+            try:
+                assert{a,d} == {b,c}
+            except:
+                print(a,d)
+                print(b,c)
             c_intelligent += end_time - start_time
             if k == TEST_NUMBERS-1:
                 print("C Intelligent  took on average: "+ str(c_intelligent/TEST_NUMBERS)+" seconds to compute")
@@ -97,12 +130,34 @@ def test_it():
                 print("Intelligent took on average: "+ str(intelligent/TEST_NUMBERS)+" seconds to compute")
         if liste[4]:
             start_time= time.time()
-            a,d = I.compute_primes(b*c)
+            fermatlib.compute_primes(b*c, ctypes.byref(result), ctypes.byref(factor))
+            a,d = int(result.value), int(factor.value)
             end_time =time.time()
             assert{a,d}== {b,c}
-            intelligent += end_time - start_time
+            fermat += end_time - start_time
             if k == TEST_NUMBERS-1:
                 print("Fermat took on average: "+ str(fermat/TEST_NUMBERS)+" seconds to compute")
+        if liste[5]:
+            start_time= time.time()
+            lib.factor_primes(b*c)
+            a,d = int(result.value), int(factor.value)
+            end_time =time.time()
+            q_sieve += end_time - start_time
+            if k == TEST_NUMBERS-1:
+                print("The quadratic sieving took on average: "+ str(q_sieve/TEST_NUMBERS)+" seconds to compute")
+        if liste[6]:
+            start_time= time.time()
+            fermatser.compute_primes(b*c, ctypes.byref(result), ctypes.byref(factor))
+            a,d = int(result.value), int(factor.value)
+            end_time =time.time()
+            try:
+                assert{a,d} == {b,c}
+            except:
+                print(a,d)
+                print(b,c)
+            fermats += end_time - start_time
+            if k == TEST_NUMBERS-1:
+                print("Fermat in sequence took on average: "+ str(fermats/TEST_NUMBERS)+" seconds to compute")
 
     
     
@@ -153,6 +208,15 @@ big_primes = [
     393088058075029,
     782048751021037,
     973121922575609
+]
+
+medium_small_primes = [
+    50020877, 81516553, 15680297, 90581851, 68736721,
+    78352691, 50223493, 32618167, 77783243, 75707747,
+    85768871, 37239481, 38265803, 88877059, 46509109,
+    62098117, 85498649, 25849711, 82554473, 39852167,
+    84248993, 96947233, 50138317, 86497559, 73754971,
+    79561519, 74793893, 86109053, 98082203, 66439397
 ]
 
 

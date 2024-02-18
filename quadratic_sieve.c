@@ -16,25 +16,7 @@ void perform_sieving(long long* factor_base, int count, long long n, int*** matr
 long long* generate_factor_base(long long n, int* count);
 cudaError_t transferDenseMatrixToCSRAndToDevice(int** matrix, int numRows, int numCols, int** d_csrRowPtr, int** d_csrColInd, int* nnz);
 
-void factor_primes(long long n) {
-    int count;
-    long long* factor_base = generate_factor_base(n, &count);
-    int** matrix = NULL;
-    int num_smooth_numbers = 0;
-    
-    // Step 2: sieeeve
-    //perform_sieving(factor_base, count, n, &matrix, &num_smooth_numbers);
-    
-    // Step 3: and then finish it off
-    //solve_linear_algebra(relations, num_relations, count);
-    
-    // Cleanup
-    /*free(factor_base);
-    for (int i = 0; i < num_relations; i++) {
-        free(relations[i]);
-    }
-    free(relations);*/
-}
+
 
 
 
@@ -308,8 +290,7 @@ void print_matrix(int** matrix, int num_smooth_numbers, int count) {
     }
 }
 
-int main() {
-    long long n = 15; // The number to factor
+extern "C" void factor_primes(long long n) {
     int count;
     long long* factor_base = generate_factor_base(n, &count);
     int** matrix = NULL;
