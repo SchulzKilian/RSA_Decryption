@@ -32,15 +32,15 @@ __global__ void pollardsRhoKernel(unsigned long long N, unsigned long long *d_ou
     }
 }
 
-// Host function to launch the kernel
+
 void runPollardsRho(unsigned long long N, int c) {
     unsigned long long *d_out; // Device output
     unsigned long long h_out = 0; // Host output
 
-    // Allocate memory on the device
+    // Allocat on the device
     cudaMalloc(&d_out, sizeof(unsigned long long));
 
-    // Kernel launch parameters
+    // Launch kernel
     int threadsPerBlock = 256;
     int blocks = (N + threadsPerBlock - 1) / threadsPerBlock;
 
