@@ -50,6 +50,23 @@ bool is_prime(int n) {
     return true;
 }
 
+
+#define CHECK_CUDA(call) do { \
+    cudaError_t err = call; \
+    if (err != cudaSuccess) { \
+        fprintf(stderr, "CUDA error in file '%s' in line %i: %s.\n", __FILE__, __LINE__, cudaGetErrorString(err)); \
+        exit(EXIT_FAILURE); \
+    } \
+} while (0)
+
+#define CHECK_CUSPARSE(call) do { \
+    cusparseStatus_t err = call; \
+    if (err != CUSPARSE_STATUS_SUCCESS) { \
+        fprintf(stderr, "CUSPARSE error in file '%s' in line %i.\n", __FILE__, __LINE__); \
+        exit(EXIT_FAILURE); \
+    } \
+} while (0)
+
 long long* generate_factor_base(long long n, int* count) {
     int size = (int)exp(sqrt(log(n) * log(log(n))));   // a common heuristic for how many prime numbers to check
     
@@ -313,7 +330,7 @@ int main() {
     printf("Value of count: %d\n", count);
 
     // Assuming transferMatrixToCSRAndToDevice is correctly implemented
-    cudaError_t transferStatus = transferMatrixToCSRAndToDevice(matrix, num_smooth_numbers, count, &d_csrRowPtr, &d_csrColInd, &d_values, nnz);
+    cudaError_t transferStatus = transferMatrixToCSRAndToDevice(matrix, num_smooth_numbers, count, &d_csrRowPtr, &d_csrColInd, nnz);
     if (transferStatus != cudaSuccess) {
         printf("Error transferring matrix to device: %s\n", cudaGetErrorString(transferStatus));
         return 1; // Handle error
