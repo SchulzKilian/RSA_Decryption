@@ -325,7 +325,7 @@ int main() {
     float* d_b = NULL; // Assuming d_b is initialized somewhere
     float* h_x = (float*)malloc(n * sizeof(float)); // Solution vector
     float alpha = 1.0f; // Assuming alpha is used for scaling
-
+    cusparseSpSVDescr_t spsvDescr;
     printf("Number of smooth numbers: %d\n", num_smooth_numbers);
     printf("Value of count: %d\n", count);
 
@@ -362,7 +362,7 @@ int main() {
     // Assuming you have initialized d_b with your specific values
     // For example, if d_b should be a vector of ones:
     // CHECK_CUDA(cudaMemset(d_b, 1, n * sizeof(float)));
-
+    CHECK_CUSPARSE(cusparseSpSV_createDescr(&spsvDescr));
     // Perform the solve operation
     size_t bufferSize = 0;
     void* dBuffer = NULL;
@@ -390,6 +390,7 @@ int main() {
     cusparseDestroyDnVec(vecX);
     cusparseDestroyDnVec(vecB);
     cusparseDestroy(cusparseH);
+    cusparseSpSV_destroyDescr(spsvDescr);
     cudaFree(dBuffer);
     cudaFree(d_x);
     cudaFree(d_b);
