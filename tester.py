@@ -9,7 +9,7 @@ import ctypes
 # Config variables
 MIN_RANGE = 10000
 MAX_RANGE = 100000
-TEST_NUMBERS = 100
+TEST_NUMBERS = 20
 
 liste = [
          False, # cuda normal
@@ -120,8 +120,9 @@ def test_it():
         if liste[1]:
             start_time= time.time()
             lib.compute_primes(b*c, ctypes.byref(result), ctypes.byref(factor))
-            a,d = int(result.value), int(factor.value)
             end_time =time.time()
+            a,d = int(result.value), int(factor.value)
+            
             try:
                 assert{a,d} == {b,c}
             except:
@@ -208,7 +209,7 @@ def test_it():
                 print("Pollard in sequential took on average: "+ str(pollard_sequential/TEST_NUMBERS)+" seconds to compute")
 
     print("The speedup from my parallel algorithm is about "+ str(c_intelligent/pollard)+ " for brute force versus parallel in " + str(TEST_NUMBERS) + " iterations.")
-    print("The speedup from my parallel algorithm is about "+ str(pollard_sequential/pollard)+ " for pollard sequential versus parallel in " + str(TEST_NUMBERS) + " iterations.")
+    #print("The speedup from my parallel algorithm is about "+ str(pollard_sequential/pollard)+ " for pollard sequential versus parallel in " + str(TEST_NUMBERS) + " iterations.")
 
 
     

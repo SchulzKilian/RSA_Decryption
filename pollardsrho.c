@@ -36,15 +36,15 @@ uint64_t abs_diff(uint64_t a, uint64_t b) {
     return a > b ? a - b : b - a;
 }
 
-// Forward declare the ThreadData structure
+
 typedef struct {
     uint64_t n;
     uint64_t seed;
     uint64_t result;
-    volatile uint8_t running; // Make running volatile for visibility across threads
+    volatile uint8_t running; // volatile so it can be seen
 } ThreadData;
 
-// Now declare pollard_rho_brent with the correctly defined ThreadData
+// Now declare pollard_rho_brent with the crrectly defined ThreadData
 uint64_t pollard_rho_brent(ThreadData* data);
 
 void* thread_function(void* arg) {

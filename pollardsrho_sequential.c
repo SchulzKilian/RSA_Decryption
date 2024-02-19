@@ -1,17 +1,20 @@
 #include <stdint.h>
 
-// Function to compute the greatest common divisor (GCD) of two numbers
+// Iterative version of the GCD function
 uint64_t gcd(uint64_t a, uint64_t b) {
-    if (b == 0)
-        return a;
-    return gcd(b, a % b);
+    while (b != 0) {
+        uint64_t temp = b;
+        b = a % b;
+        a = temp;
+    }
+    return a;
 }
 
-// Pollard's Rho Algorithm for integer factorization
+// Pollard's Rho Algorithm for integer factorization remains the same
 uint64_t pollards_rho(uint64_t n) {
     uint64_t x = 2, y = 2, d = 1;
     uint64_t c = 1;
-    
+
     while (d == 1 || d == n || d == 0) {
         x = (x * x + c) % n;
         y = (y * y + c) % n;
@@ -22,7 +25,7 @@ uint64_t pollards_rho(uint64_t n) {
     return d;
 }
 
-// Function to compute primess
+// Function to compute primes
 void compute_primes(uint64_t n, uint64_t *result, uint64_t *factor) {
     uint64_t factor1, factor2;
 
@@ -31,4 +34,5 @@ void compute_primes(uint64_t n, uint64_t *result, uint64_t *factor) {
 
     *result = factor1;
     *factor = factor2;
+    return;
 }
