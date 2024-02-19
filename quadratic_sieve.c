@@ -14,7 +14,7 @@ bool is_prime(int n);
 long long mod_exp(long long base, long long exp, long long mod); // Declare mod_exp
 void perform_sieving(long long* factor_base, int count, long long n, int*** matrix, int* num_smooth_numbers, int* nnz);
 long long* generate_factor_base(long long n, int* count);
-cudaError_t transferMatrixToCSRAndToDevice(int** matrix, int numRows, int numCols, int** d_csrRowPtr, int** d_csrColInd, int* nnz);
+cudaError_t transferMatrixToCSRAndToDevice(int** matrix, int numRows, int numCols, int** d_csrRowPtr, int** d_csrColInd, int nnz);
 
 
 
@@ -50,7 +50,7 @@ bool is_prime(int n) {
 } while (0)
 
 
-void solveSparseSystem(int* d_csrRowPtr, int* d_csrColInd, int* d_csrVals, int numRows, int nnz, float* d_b) {
+void solveSparseSystem(int* d_csrRowPtr, int* d_csrColInd, int numRows, int nnz, float* d_b) {
     cusparseHandle_t cusparseH = NULL;
     cusparseSpMatDescr_t matA = NULL;
     cusparseDnVecDescr_t vecX = NULL, vecB = NULL;
@@ -83,11 +83,11 @@ void solveSparseSystem(int* d_csrRowPtr, int* d_csrColInd, int* d_csrVals, int n
 
 
     size_t bufferSize = 0;
-    CHECK_CUSPARSE(cusparseSpSV_bufferSize(cusparseH, CUSPARSE_OPERATION_NON_TRANSPOSE, &alpha, matA, vecB, vecX, CUDA_R_32F, CUSPARSE_SPSV_ALG_DEFAULT, &bufferSize));
+    CHECK_CUSPARSE(cusparseSpSV_bufferSize(cusparseH, CUSPARSE_OPERATION_NON_TRANSPOSE, &alpha, matA, vecB, vecX, CUDA_R_32F, CUSPARSE_SPSV_ALG_DEFAULT, spsvDescr, &bufferSize));
     CHECK_CUDA(cudaMalloc(&dBuffer, bufferSize));
 
 
-    CHECK_CUSPARSE(cusparseSpSV_solve(cusparseH, CUSPARSE_OPERATION_NON_TRANSPOSE, &alpha, matA, vecB, vecX, CUDA_R_32F, CUSPARSE_SPSV_ALG_DEFAULT, dBuffer));
+    CHECK_CUSPARSE(cusparseSpSV_solve(cusparseH, CUSPARSE_OPERATION_NON_TRANSPOSE, &alpha, matA, vecB, vecX, CUDA_R_32F, CUSPARSE_SPSV_ALG_DEFAULT, spsvDescr, dBuffer));
 
 
     CHECK_CUDA(cudaFree(dBuffer));
@@ -346,7 +346,7 @@ void print_matrix(int** matrix, int num_smooth_numbers, int count) {
     }
 }
 
-extern "C" void factor_primes(long long n) {
+void factor_primes(long long n) {
     int count;
     long long* factor_base = generate_factor_base(n, &count);
     int** matrix = NULL;
