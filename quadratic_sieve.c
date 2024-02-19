@@ -84,6 +84,8 @@ cudaError_t solveSparseSystem(int* d_csrRowPtr, int* d_csrColInd, int numRows, i
 
 
     size_t bufferSize = 0;
+    cusparseSpSVDescr_t spsvDescr = NULL;
+    CHECK_CUSPARSE(cusparseSpSV_createDescr(&spsvDescr));
     CHECK_CUSPARSE(cusparseSpSV_bufferSize(cusparseH, CUSPARSE_OPERATION_NON_TRANSPOSE, &alpha, matA, vecB, vecX, CUDA_R_32F, CUSPARSE_SPSV_ALG_DEFAULT, spsvDescr, &bufferSize));
     CHECK_CUDA(cudaMalloc(&dBuffer, bufferSize));
 
@@ -347,7 +349,7 @@ void print_matrix(int** matrix, int num_smooth_numbers, int count) {
     }
 }
 
-void factor_primes(long long n) {
+int factor_primes(long long n) {
     int count;
     long long* factor_base = generate_factor_base(n, &count);
     int** matrix = NULL;
@@ -365,7 +367,7 @@ void factor_primes(long long n) {
     } else {
         printf("Matrix transferred to device successfully!\n");
     }
-    cudaError_t solveStatus = solveSparseSystem(d_csrRowPtr, d_csrColInd, num_smooth_numbers, nnz, d_b);
+    cudaError_t solveStatus = solveSparseSystem(d_csrRowPtr, d_csrColInd, num_smooth_numbers, nnz);
     if (transferStatus != cudaSuccess) {
         printf("Error solving matrix : %s\n", cudaGetErrorString(transferStatus));
  
