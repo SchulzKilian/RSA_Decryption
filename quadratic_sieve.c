@@ -50,7 +50,7 @@ bool is_prime(int n) {
 } while (0)
 
 
-void solveSparseSystem(int* d_csrRowPtr, int* d_csrColInd, int numRows, int nnz, float* d_b) {
+void solveSparseSystem(int* d_csrRowPtr, int* d_csrColInd, int numRows, int nnz) {
     cusparseHandle_t cusparseH = NULL;
     cusparseSpMatDescr_t matA = NULL;
     cusparseDnVecDescr_t vecX = NULL, vecB = NULL;
@@ -364,7 +364,7 @@ void factor_primes(long long n) {
     } else {
         printf("Matrix transferred to device successfully!\n");
     }
-    solveSparseSystem(d_csrRowPtr, d_csrColInd, d_csrVals, num_smooth_numbers, nnz, d_b);
+    solveSparseSystem(d_csrRowPtr, d_csrColInd, num_smooth_numbers, nnz, d_b);
 
     return 0;
 }
