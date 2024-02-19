@@ -50,13 +50,13 @@ bool is_prime(int n) {
 } while (0)
 
 
-void solveSparseSystem(int* d_csrRowPtr, int* d_csrColInd, int numRows, int nnz) {
+cudaError_t solveSparseSystem(int* d_csrRowPtr, int* d_csrColInd, int numRows, int nnz) {
     cusparseHandle_t cusparseH = NULL;
     cusparseSpMatDescr_t matA = NULL;
     cusparseDnVecDescr_t vecX = NULL, vecB = NULL;
     void* dBuffer = NULL;
     float alpha = 1.0;
-    float* d_x; 
+    unsigned char* d_x; 
     unsigned char* d_csrVals; 
 
 
@@ -66,8 +66,8 @@ void solveSparseSystem(int* d_csrRowPtr, int* d_csrColInd, int numRows, int nnz)
 
 // Set each byte in d_csrVals to 1
     CHECK_CUDA(cudaMemset(d_csrVals, 1, nnz * sizeof(unsigned char)));
-    CHECK_CUDA(cudaMalloc((void**)&d_x, numRows * sizeof(float)));
-
+    CHECK_CUDA(cudaMalloc((void**)&d_x, numRows * sizeof(unsigned char)));
+    CHECK_CUDA(cudaMemset(d_csrVals, 0, numRows * sizeof(unsigned char)));
 
     CHECK_CUSPARSE(cusparseCreateCsr(&matA, numRows, numRows, nnz, d_csrRowPtr, d_csrColInd, d_csrVals,
                                      CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I,
@@ -343,7 +343,7 @@ void print_matrix(int** matrix, int num_smooth_numbers, int count) {
     }
 }
 
-void factor_primes(long long n) {
+int factor_primes(long long n) {
     int count;
     long long* factor_base = generate_factor_base(n, &count);
     int** matrix = NULL;
@@ -361,7 +361,13 @@ void factor_primes(long long n) {
     } else {
         printf("Matrix transferred to device successfully!\n");
     }
-    solveSparseSystem(d_csrRowPtr, d_csrColInd, num_smooth_numbers, nnz, d_b);
+    cudaError_t solveStatus = solveSparseSystem(d_csrRowPtr, d_csrColInd, num_smooth_numbers, nnz, d_b);
+    if (transferStatus != cudaSuccess) {
+        printf("Error solving matrix : %s\n", cudaGetErrorString(transferStatus));
+ 
+    } else {
+        printf("Matrix solved successfully!\n");
+    }
 
     return 0;
 }
