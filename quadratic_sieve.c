@@ -368,3 +368,17 @@ extern "C" void factor_primes(long long n) {
 
     return 0;
 }
+
+
+int main() {
+    long long n;
+
+    // Prompt user for input or set the value of n directly
+    printf("Enter a number to factorize: ");
+    scanf("%lld", &n);
+
+    // Call the factor_primes function with the given number
+    factor_primes(n);
+
+    return 0;
+}
