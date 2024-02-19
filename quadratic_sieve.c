@@ -86,12 +86,13 @@ cudaError_t solveSparseSystem(int* d_csrRowPtr, int* d_csrColInd, int numRows, i
     size_t bufferSize = 0;
     cusparseSpSVDescr_t spsvDescr = NULL;
     CHECK_CUSPARSE(cusparseSpSV_createDescr(&spsvDescr));
-    CHECK_CUSPARSE(cusparseSpSV_bufferSize(cusparseH, CUSPARSE_OPERATION_NON_TRANSPOSE, &alpha, matA, vecB, vecX, CUDA_R_32F, CUSPARSE_SPSV_ALG_DEFAULT, spsvDescr, &bufferSize));
+    size_t bufferSize = 0;
+    CHECK_CUSPARSE(cusparseSpSV_bufferSize(cusparseH, CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                        &alpha, matA, vecB, vecX, CUDA_R_32F, &bufferSize));
     CHECK_CUDA(cudaMalloc(&dBuffer, bufferSize));
 
-
-    CHECK_CUSPARSE(cusparseSpSV_solve(cusparseH, CUSPARSE_OPERATION_NON_TRANSPOSE, &alpha, matA, vecB, vecX, CUDA_R_32F, CUSPARSE_SPSV_ALG_DEFAULT, spsvDescr, dBuffer));
-
+    CHECK_CUSPARSE(cusparseSpSV_solve(cusparseH, CUSPARSE_OPERATION_NON_TRANSPOSE,
+                                    &alpha, matA, vecB, vecX, CUDA_R_32F, dBuffer));
 
     CHECK_CUDA(cudaFree(dBuffer));
     CHECK_CUSPARSE(cusparseDestroyDnVec(vecX));
