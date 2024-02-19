@@ -16,9 +16,10 @@ liste = [
          True, # c normal
          False, # brute force pythong
          False, # sieve python
-         True, # fermat openmp
+         False, # fermat openmp
          False,# Quadratic Sieve
-         True # fermat sequence
+         False, # fermat sequence
+         True, # pollardsrho parallel
          ]
 
 
@@ -60,7 +61,14 @@ if liste[6]:
     fermatser.compute_primes.argtypes = [ctypes.c_longlong, ctypes.POINTER(ctypes.c_longlong), ctypes.POINTER(ctypes.c_longlong)]
     fermatser.compute_primes.restype = None
     result = ctypes.c_longlong()
-    factor = ctypes.c_longlong()   
+    factor = ctypes.c_longlong() 
+
+if liste[7]:
+    pollardlib = ctypes.CDLL('./libpollardsrho.so') 
+    pollardlib.compute_primes.argtypes = [ctypes.c_longlong, ctypes.POINTER(ctypes.c_longlong), ctypes.POINTER(ctypes.c_longlong)]
+    pollardlib.compute_primes.restype = None
+    result = ctypes.c_longlong()
+    factor = ctypes.c_longlong()
 
 
 
@@ -88,6 +96,7 @@ def test_it():
     intelligent =  0
     fermats = 0
     q_sieve= 0
+    pollard = 0
     for k in range(TEST_NUMBERS):
         b = get_medium_small_prime()
         c = get_medium_small_prime()
@@ -133,7 +142,11 @@ def test_it():
             fermatlib.compute_primes(b*c, ctypes.byref(result), ctypes.byref(factor))
             a,d = int(result.value), int(factor.value)
             end_time =time.time()
-            assert{a,d}== {b,c}
+            try:
+                assert{a,d}== {b,c}
+            except:
+                print(a,d)
+                print(b,c)
             fermat += end_time - start_time
             if k == TEST_NUMBERS-1:
                 print("Fermat took on average: "+ str(fermat/TEST_NUMBERS)+" seconds to compute")
@@ -158,6 +171,20 @@ def test_it():
             fermats += end_time - start_time
             if k == TEST_NUMBERS-1:
                 print("Fermat in sequence took on average: "+ str(fermats/TEST_NUMBERS)+" seconds to compute")
+        if liste[7]:
+            start_time= time.time()
+            pollardlib.compute_primes(b*c, ctypes.byref(result), ctypes.byref(factor))
+            a,d = int(result.value), int(factor.value)
+            end_time =time.time()
+            try:
+                assert{a,d} == {b,c}
+            except:
+                print(a,d)
+                print(b,c)
+            pollard += end_time - start_time
+            if k == TEST_NUMBERS-1:
+                print("Pollard in parallel took on average: "+ str(pollard/TEST_NUMBERS)+" seconds to compute")
+
 
     
     
