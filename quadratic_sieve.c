@@ -57,18 +57,15 @@ void solveSparseSystem(int* d_csrRowPtr, int* d_csrColInd, int numRows, int nnz)
     void* dBuffer = NULL;
     float alpha = 1.0;
     float* d_x; 
+    unsigned char* d_csrVals; 
 
 
     CHECK_CUSPARSE(cusparseCreate(&cusparseH));
 
-        
-    CHECK_CUDA(cudaMalloc((void**)&d_csrVals, nnz * sizeof(float)));
-    float* ones = (float*)malloc(nnz * sizeof(float));
-    for (int i = 0; i < nnz; ++i) {
-        ones[i] = 1.0;
-    }
-    CHECK_CUDA(cudaMemcpy(d_csrVals, ones, nnz * sizeof(float), cudaMemcpyHostToDevice));
-    free(ones);
+    CHECK_CUDA(cudaMalloc((void**)&d_csrVals, nnz * sizeof(unsigned char)));
+
+// Set each byte in d_csrVals to 1
+    CHECK_CUDA(cudaMemset(d_csrVals, 1, nnz * sizeof(unsigned char)));
     CHECK_CUDA(cudaMalloc((void**)&d_x, numRows * sizeof(float)));
 
 
