@@ -13,11 +13,11 @@ TEST_NUMBERS = 5
 
 liste = [
          False, # cuda normal
-         False, # c normal
+         True, # c normal
          False, # brute force pythong
          False, # sieve python
-         False, # fermat openmp
-         True,# Quadratic Sieve
+         True, # fermat openmp
+         False,# Quadratic Sieve
          True # fermat sequence
          ]
 
@@ -89,8 +89,8 @@ def test_it():
     fermats = 0
     q_sieve= 0
     for k in range(TEST_NUMBERS):
-        b = get_medium_prime()
-        c = get_medium_prime()
+        b = get_medium_small_prime()
+        c = get_medium_small_prime()
         if liste[0]:
             start_time= time.time()
             a,d = cudalib.compute_primes(b*c, ctypes.byref(result), ctypes.byref(factor))
@@ -139,7 +139,7 @@ def test_it():
                 print("Fermat took on average: "+ str(fermat/TEST_NUMBERS)+" seconds to compute")
         if liste[5]:
             start_time= time.time()
-            lib.factor_primes(b*c)
+            quadlib.factor_primes(b*c)
             a,d = int(result.value), int(factor.value)
             end_time =time.time()
             q_sieve += end_time - start_time

@@ -14,7 +14,7 @@ bool is_prime(int n);
 long long mod_exp(long long base, long long exp, long long mod); // Declare mod_exp
 void perform_sieving(long long* factor_base, int count, long long n, int*** matrix, int* num_smooth_numbers, int* nnz);
 long long* generate_factor_base(long long n, int* count);
-cudaError_t transferDenseMatrixToCSRAndToDevice(int** matrix, int numRows, int numCols, int** d_csrRowPtr, int** d_csrColInd, int* nnz);
+cudaError_t transferMatrixToCSRAndToDevice(int** matrix, int numRows, int numCols, int** d_csrRowPtr, int** d_csrColInd, int* nnz);
 
 
 
@@ -48,6 +48,62 @@ bool is_prime(int n) {
         exit(EXIT_FAILURE); \
     } \
 } while (0)
+
+
+void solveSparseSystem(int* d_csrRowPtr, int* d_csrColInd, int* d_csrVals, int numRows, int nnz, float* d_b) {
+    cusparseHandle_t cusparseH = NULL;
+    cusparseSpMatDescr_t matA = NULL;
+    cusparseDnVecDescr_t vecX = NULL, vecB = NULL;
+    void* dBuffer = NULL;
+    float alpha = 1.0;
+    float* d_x; 
+
+
+    CHECK_CUSPARSE(cusparseCreate(&cusparseH));
+
+        
+    CHECK_CUDA(cudaMalloc((void**)&d_csrVals, nnz * sizeof(float)));
+    float* ones = (float*)malloc(nnz * sizeof(float));
+    for (int i = 0; i < nnz; ++i) {
+        ones[i] = 1.0;
+    }
+    CHECK_CUDA(cudaMemcpy(d_csrVals, ones, nnz * sizeof(float), cudaMemcpyHostToDevice));
+    free(ones);
+    CHECK_CUDA(cudaMalloc((void**)&d_x, numRows * sizeof(float)));
+
+
+    CHECK_CUSPARSE(cusparseCreateCsr(&matA, numRows, numRows, nnz, d_csrRowPtr, d_csrColInd, d_csrVals,
+                                     CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I,
+                                     CUSPARSE_INDEX_BASE_ZERO, CUDA_R_32F));
+
+    CHECK_CUSPARSE(cusparseCreateDnVec(&vecB, numRows, d_b, CUDA_R_32F));
+
+
+    CHECK_CUSPARSE(cusparseCreateDnVec(&vecX, numRows, d_x, CUDA_R_32F));
+
+
+    size_t bufferSize = 0;
+    CHECK_CUSPARSE(cusparseSpSV_bufferSize(cusparseH, CUSPARSE_OPERATION_NON_TRANSPOSE, &alpha, matA, vecB, vecX, CUDA_R_32F, CUSPARSE_SPSV_ALG_DEFAULT, &bufferSize));
+    CHECK_CUDA(cudaMalloc(&dBuffer, bufferSize));
+
+
+    CHECK_CUSPARSE(cusparseSpSV_solve(cusparseH, CUSPARSE_OPERATION_NON_TRANSPOSE, &alpha, matA, vecB, vecX, CUDA_R_32F, CUSPARSE_SPSV_ALG_DEFAULT, dBuffer));
+
+
+    CHECK_CUDA(cudaFree(dBuffer));
+    CHECK_CUSPARSE(cusparseDestroyDnVec(vecX));
+    CHECK_CUSPARSE(cusparseDestroyDnVec(vecB));
+    CHECK_CUSPARSE(cusparseDestroySpMat(matA));
+    CHECK_CUSPARSE(cusparseDestroy(cusparseH));
+
+
+    float* h_x = (float*)malloc(numRows * sizeof(float));
+    cudaMemcpy(h_x, d_x, numRows * sizeof(float), cudaMemcpyDeviceToHost);
+
+
+    CHECK_CUDA(cudaFree(d_x));
+
+}
 
 long long* generate_factor_base(long long n, int* count) {
     int size = (int)exp(sqrt(log(n) * log(log(n))));   // a common heuristic for how many prime numbers to check
@@ -298,71 +354,17 @@ extern "C" void factor_primes(long long n) {
     int nnz;
 
     perform_sieving(factor_base, count, n, &matrix, &num_smooth_numbers, &nnz);
-
+    
     int* d_csrRowPtr = NULL;
     int* d_csrColInd = NULL;
-    float* d_values = NULL; // The values will be 1s
-    float* d_x = NULL;
-    float* d_b = NULL; // Assuming d_b is initialized somewhere
-    float* h_x = (float*)malloc(n * sizeof(float)); // Solution vector
-    cusparseSpSVDescr_t spsvDescr;
-float alpha = 1.0f; // Assuming this is your scalar multiplier
-
-// Step 1: Create the SpSV descriptor
-CHECK_CUSPARSE(cusparseSpSV_createDescr(&spsvDescr));
-
-// Step 2: Query the buffer size for the SpSV operation
-size_t bufferSize = 0;
-void* dBuffer = NULL;
-CHECK_CUSPARSE(cusparseSpSV_bufferSize(
-    cusparseH,
-    CUSPARSE_OPERATION_NON_TRANSPOSE,
-    &alpha,
-    matA,
-    vecB,
-    vecX,
-    CUDA_R_32F,
-    CUSPARSE_SPSV_ALG_DEFAULT,
-    spsvDescr,
-    &bufferSize
-));
-
-// Allocate buffer for the operation
-CHECK_CUDA(cudaMalloc(&dBuffer, bufferSize));
-
-// Step 3: Perform the solve operation
-CHECK_CUSPARSE(cusparseSpSV_solve(
-    cusparseH,
-    CUSPARSE_OPERATION_NON_TRANSPOSE,
-    &alpha,
-    matA,
-    vecB,
-    vecX,
-    CUDA_R_32F,
-    CUSPARSE_SPSV_ALG_DEFAULT,
-    spsvDescr,
-    dBuffer
-));
-
-
-    cusparseDestroySpMat(matA);
-    cusparseDestroyDnVec(vecX);
-    cusparseDestroyDnVec(vecB);
-    cusparseDestroy(cusparseH);
-    cusparseSpSV_destroyDescr(spsvDescr);
-    cudaFree(dBuffer);
-    cudaFree(d_x);
-    cudaFree(d_b);
-    cudaFree(d_values);
-    cudaFree(d_csrRowPtr);
-    cudaFree(d_csrColInd);
-    free(h_x);
-
-    for (int i = 0; i < num_smooth_numbers; ++i) {
-        free(matrix[i]);
+    cudaError_t transferStatus = transferMatrixToCSRAndToDevice(matrix, num_smooth_numbers, count, &d_csrRowPtr, &d_csrColInd, nnz);
+    if (transferStatus != cudaSuccess) {
+        printf("Error transferring matrix to device: %s\n", cudaGetErrorString(transferStatus));
+        // Handle error
+    } else {
+        printf("Matrix transferred to device successfully!\n");
     }
-    free(matrix);
-    free(factor_base);
+    solveSparseSystem(d_csrRowPtr, d_csrColInd, d_csrVals, num_smooth_numbers, nnz, d_b);
 
     return 0;
 }
