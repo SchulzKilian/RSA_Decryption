@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <math.h>
 
-#define NUM_THREADS 8
+#define NUM_THREADS 8 // only cause i have 8 cores and for me it works best, different approaches possible
 
 uint64_t gcd(uint64_t a, uint64_t b) {
     while (b != 0) {
@@ -54,6 +54,7 @@ void* thread_function(void* arg) {
 }
 
 uint64_t pollard_rho_brent(ThreadData* data) {
+    int16_t LOW_GCD_THRESHOLD = 100;
     uint64_t n = data->n, seed = data->seed;
     if (n % 2 == 0) return 2;
     uint64_t x = seed, y = seed, g = 1, r = 1, q = 1;
@@ -73,6 +74,11 @@ uint64_t pollard_rho_brent(ThreadData* data) {
                 q = modular_mul(q, abs_diff(x, y), n);
             }
             g = gcd(q, n);
+            if (g < LOW_GCD_THRESHOLD && g!=1) {
+                // This thread found a promising GCD
+                // Adjust parameters to search more aggressively
+                r *= 2; 
+            }
             k += m;
         }
         r *= 2;

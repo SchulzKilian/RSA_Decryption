@@ -9,7 +9,7 @@ import ctypes
 # Config variables
 MIN_RANGE = 10000
 MAX_RANGE = 100000
-TEST_NUMBERS = 20
+TEST_NUMBERS = 10
 
 liste = [
          False, # cuda normal
@@ -20,7 +20,7 @@ liste = [
          False,# Quadratic Sieve
          False, # fermat sequence
          True, # pollardsrho parallel
-         False, # pollardsrho sequential
+
          ]
 
 
@@ -66,17 +66,11 @@ if liste[6]:
 
 if liste[7]:
     pollardlib = ctypes.CDLL('./libpollardsrho.so') 
-    pollardlib.compute_primes.argtypes = [ctypes.c_longlong, ctypes.POINTER(ctypes.c_longlong), ctypes.POINTER(ctypes.c_longlong)]
+    pollardlib.compute_primes.argtypes = [ctypes.c_ulonglong, ctypes.POINTER(ctypes.c_ulonglong), ctypes.POINTER(ctypes.c_ulonglong)]
     pollardlib.compute_primes.restype = None
-    result = ctypes.c_longlong()
-    factor = ctypes.c_longlong()
+    result = ctypes.c_ulonglong()
+    factor = ctypes.c_ulonglong()
 
-if liste[8]:
-    pollardlib_sequential = ctypes.CDLL('./libpollardsrho_sequential.so') 
-    pollardlib_sequential.compute_primes.argtypes = [ctypes.c_longlong, ctypes.POINTER(ctypes.c_longlong), ctypes.POINTER(ctypes.c_longlong)]
-    pollardlib_sequential.compute_primes.restype = None
-    result = ctypes.c_longlong()
-    factor = ctypes.c_longlong()
 
 
 
@@ -107,7 +101,7 @@ def test_it():
     pollard = 0
     pollard_sequential = 0
     for k in range(TEST_NUMBERS):
-        b = get_medium_small_prime()
+        b = get_medium_prime()
         c = get_medium_small_prime()
         if liste[0]:
             start_time= time.time()
@@ -118,11 +112,15 @@ def test_it():
             if k == TEST_NUMBERS-1:
                 print("CUDA  took on average: "+ str(cuda/TEST_NUMBERS)+" seconds to compute")
         if liste[1]:
+            lib = ctypes.CDLL('./libprimes.so') 
+            lib.compute_primes.argtypes = [ctypes.c_longlong, ctypes.POINTER(ctypes.c_longlong), ctypes.POINTER(ctypes.c_longlong)]
+            lib.compute_primes.restype = None
+            result = ctypes.c_longlong()
+            factor = ctypes.c_longlong()
             start_time= time.time()
             lib.compute_primes(b*c, ctypes.byref(result), ctypes.byref(factor))
-            end_time =time.time()
             a,d = int(result.value), int(factor.value)
-            
+            end_time =time.time()  
             try:
                 assert{a,d} == {b,c}
             except:
@@ -182,6 +180,11 @@ def test_it():
             if k == TEST_NUMBERS-1:
                 print("Fermat in sequence took on average: "+ str(fermats/TEST_NUMBERS)+" seconds to compute")
         if liste[7]:
+            pollardlib = ctypes.CDLL('./libpollardsrho.so') 
+            pollardlib.compute_primes.argtypes = [ctypes.c_ulonglong, ctypes.POINTER(ctypes.c_ulonglong), ctypes.POINTER(ctypes.c_ulonglong)]
+            pollardlib.compute_primes.restype = None
+            result = ctypes.c_ulonglong()
+            factor = ctypes.c_ulonglong()
             start_time= time.time()
             pollardlib.compute_primes(b*c, ctypes.byref(result), ctypes.byref(factor))
             end_time =time.time()
@@ -194,22 +197,9 @@ def test_it():
             pollard += end_time - start_time
             if k == TEST_NUMBERS-1:
                 print("Pollard in parallel took on average: "+ str(pollard/TEST_NUMBERS)+" seconds to compute")
-        if liste[8]:
-            start_time= time.time()
-            pollardlib_sequential.compute_primes(b*c, ctypes.byref(result), ctypes.byref(factor))
-            a,d = int(result.value), int(factor.value)
-            end_time =time.time()
-            try:
-                assert{a,d} == {b,c}
-            except:
-                print(a,d)
-                print(b,c)
-            pollard_sequential += end_time - start_time
-            if k == TEST_NUMBERS-1:
-                print("Pollard in sequential took on average: "+ str(pollard_sequential/TEST_NUMBERS)+" seconds to compute")
 
     print("The speedup from my parallel algorithm is about "+ str(c_intelligent/pollard)+ " for brute force versus parallel in " + str(TEST_NUMBERS) + " iterations.")
-    #print("The speedup from my parallel algorithm is about "+ str(pollard_sequential/pollard)+ " for pollard sequential versus parallel in " + str(TEST_NUMBERS) + " iterations.")
+
 
 
     
