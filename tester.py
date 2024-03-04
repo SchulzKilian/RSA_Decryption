@@ -198,7 +198,7 @@ def test_it():
             if k == TEST_NUMBERS-1:
                 print("Pollard in parallel took on average: "+ str(pollard/TEST_NUMBERS)+" seconds to compute")
 
-    print("The speedup from my parallel algorithm is about "+ str(c_intelligent/pollard)+ " for brute force versus parallel in " + str(TEST_NUMBERS) + " iterations.")
+    print("The speedup from my parallel algorithm is about "+ str(c_intelligent/pollard)+ " for sequential versus parallel in " + str(TEST_NUMBERS) + " iterations.")
 
 
 
