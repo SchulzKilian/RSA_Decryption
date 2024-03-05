@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <math.h>
+#include <gmp.h>
 #include <stdatomic.h>
 #include <time.h>
 #include <bits/pthreadtypes.h>
@@ -70,14 +71,14 @@ uint64_t pollard_rho_brent(ThreadData* data) {
     while (g == 1 && running) { // Check running flag
         x = y;
         for (uint64_t i = 0; i < r; i++) {
-            if (!running) return 0; // Early exit if not running
+            //if (!running) return 0; // Early exit if not running
             y = f(y, n);
         }
         uint64_t k = 0;
-        while (k < r && g == 1 && running) { // Check running flag
+        while (k < r && g == 1) { // Check running flag
             ys = y;
             for (uint64_t i = 0; i < m && i < r - k; i++) {
-                if (!running) return 0; // Early exit if not running
+                //if (!running) return 0; // Early exit if not running
                 y = f(y, n);
                 q = modular_mul(q, abs_diff(x, y), n);
             }
@@ -124,7 +125,7 @@ void compute_primes(uint64_t n, uint64_t *result, uint64_t *factor, int NUM_THRE
 
     for (t = 0; t < NUM_THREADS; t++) {
         data[t].n = n;
-        data[t].seed = 3 + t; // Different seed for each thread
+        data[t].seed = 2 + t; // Different seed for each thread
 
         rc = pthread_create(&threads[t], NULL, thread_function, (void*)&data[t]);
         if (rc) {
@@ -153,7 +154,7 @@ void compute_primes(uint64_t n, uint64_t *result, uint64_t *factor, int NUM_THRE
 
 
 int main() {
-    uint64_t n = 623546770855596163; // Example number to factorize should be kinda big
+    uint64_t n = 18446744030759878681ULL; // Example number to factorize should be kinda big
     uint64_t result = 0;
     uint64_t factor = 0;
     int thread_counts[] = {1, 2, 4, 8, 15, 20, 25, 32, 64,128}; // Different numbers of threads to test
@@ -163,7 +164,7 @@ int main() {
     for (int config = 0; config < num_configs; config++) {
         int NUM_THREADS = thread_counts[config]; 
         double total_time = 0.0;
-        int repetitions = 5;
+        int repetitions = 1000;
 
         for (int i = 0; i < repetitions; i++) {
             clock_t start = clock();
