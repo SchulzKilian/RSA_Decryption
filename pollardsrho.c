@@ -179,40 +179,54 @@ void compute_primes(mpz_t n, mpz_t *result, mpz_t *factor, int NUM_THREADS) {
 
 
 int main() {
-    mpz_t n;
-    mpz_init_set_str(n, "3077620532184161903861", 10); // Initialize n with a large number
+    char* semiprimes[] = {
+        "281903819787774937209232578689",
+        "364484869645843621622832704153",
+        "345469451591760174730230603691",
+        "463398692478296989516736649887",
+        "332227475082334623786092387273",
+        "31626851437447153694819292167",
+        "777017557862414631890710147753",
+        "147496354805768937296258608211",
+        "538232757297255111133394171213",
+        "137486608107202789957046404849"
+    };
+    int num_semiprimes = sizeof(semiprimes) / sizeof(semiprimes[0]);
+    int threadnumbers[7] = {8,4,2,1,16,32,64};
+    int num_threads = sizeof(threadnumbers) / sizeof(threadnumbers[0]);
 
-    int threadnumbers[7] = {1, 2, 4, 8, 16, 32, 64};
+    for (int i = 0; i < num_threads; i++) {
+        int NUM_THREADS = threadnumbers[i];
+        double total_time_taken = 0.0;
 
+        for (int j = 0; j < 1; j++) {
+            mpz_t n, result, factor;
+            mpz_init_set_str(n, semiprimes[j], 10); // Initialize n with a large number
+            mpz_init(result);
+            mpz_init(factor);
+            atomic_store(&running, 1);
 
+            clock_t start = clock();
+            compute_primes(n, &result, &factor, NUM_THREADS);
+            clock_t end = clock();
 
-    for (int i = 0; i < 7; i++) {
+            if (mpz_cmp_ui(result, 0) != 0) { 
+                gmp_printf("Prime factor of %Zd: %Zd and %Zd\n", n, result, factor);
+            } else {
+                gmp_printf("No prime factor found for %Zd.\n", n);
+            }
 
-    int NUM_THREADS = threadnumbers[i];
-    mpz_t result, factor;
-    mpz_init(result);
-    mpz_init(factor);
-    atomic_store(&running, 1);
-    clock_t start = clock();
-    compute_primes(n, &result, &factor, NUM_THREADS);
-    clock_t end = clock();
+            double time_taken = ((double) (end - start)) / CLOCKS_PER_SEC;
+            total_time_taken += time_taken;
 
-    
-    if (mpz_cmp_ui(result, 0) != 0) {
-        gmp_printf("Prime factor: %Zd\nOther factor: %Zd\n", result, factor);
-    } else {
-        printf("No prime factor found.\n");
+            mpz_clear(n);
+            mpz_clear(result);
+            mpz_clear(factor);
+        }
+        
+        double average_time_taken = total_time_taken / num_semiprimes;
+        printf("Average execution time for %d threads: %.2f seconds\n", NUM_THREADS, average_time_taken);
     }
-    
 
-    double time_taken = ((double) (end - start)) / CLOCKS_PER_SEC;
-    printf("Execution time for %i threads: %.2f seconds\n", NUM_THREADS, time_taken);
-    
-    // Clean up
-    
-    mpz_clear(result);
-    mpz_clear(factor);
-    }
-    mpz_clear(n);
     return 0;
 }
