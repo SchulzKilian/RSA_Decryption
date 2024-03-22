@@ -192,7 +192,34 @@ int main() {
         "137486608107202789957046404849"
     };
     int num_semiprimes = sizeof(semiprimes) / sizeof(semiprimes[0]);
-    int threadnumbers[7] = {8,4,2,1,16,32,64};
+    char* medium_primes[] = {
+        "2080615832610841335480683",
+        "1438659423804570836893217",
+        "1111321301231058844462511",
+        "744777372083245989163421",
+        "6053447060883065240701121",
+        "3584405191726040249488253",
+        "2682848904165256275971861",
+        "4225513033754881584728239",
+        "4605131422979549619984269",
+        "5278982110844980463386933"
+    };
+    int num_medium_primes = sizeof(medium_primes) / sizeof(medium_primes[0]);
+        char* small_semiprimes[] = {
+        "2398115620361697",
+        "2821095062496139",
+        "3259994183448281",
+        "3714900574054983",
+        "4185934403316433",
+        "4673326814780727",
+        "5177308227255299",
+        "5698119380409281",
+        "6235999965097863",
+        "6791200376458947"
+    };
+
+    int num_small_semiprimes = sizeof(small_semiprimes) / sizeof(small_semiprimes[0]);
+    int threadnumbers[7] = {4,2,1};
     int num_threads = sizeof(threadnumbers) / sizeof(threadnumbers[0]);
 
     for (int i = 0; i < num_threads; i++) {
@@ -201,7 +228,7 @@ int main() {
 
         for (int j = 0; j < 1; j++) {
             mpz_t n, result, factor;
-            mpz_init_set_str(n, semiprimes[j], 10); // Initialize n with a large number
+            mpz_init_set_str(n, medium_primes[j], 10); // Initialize n with a large number
             mpz_init(result);
             mpz_init(factor);
             atomic_store(&running, 1);
@@ -224,7 +251,7 @@ int main() {
             mpz_clear(factor);
         }
         
-        double average_time_taken = total_time_taken / num_semiprimes;
+        double average_time_taken = total_time_taken / num_medium_primes;
         printf("Average execution time for %d threads: %.2f seconds\n", NUM_THREADS, average_time_taken);
     }
 
